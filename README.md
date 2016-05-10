@@ -1,2 +1,2 @@
 # TrackPedesANN
-Using artificial intelligence to detect and track pedestrian in real-time
+Using artificial neural network to detect and track pedestrian in real-time

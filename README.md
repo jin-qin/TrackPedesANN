@@ -24,5 +24,5 @@
 ## Wait for determining
 * [ ] Recurrent Neural Network?
 * [ ] Residual Neural Network? (The newest neural network architecture, much faster and deeper)
-* [ ] Do we need `**gitter**` or other online tools to communicate?
+* [ ] Do we need `gitter` or other online tools to communicate?
 

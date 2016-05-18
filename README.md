@@ -27,6 +27,10 @@
   - [ ] LUSV initialization
   - [ ] Xavier initialization
   - [ ] Kaiming He initialization
+* Preprocessing Method
+  - [ ] PCA or ZCA Whitening
+  - [ ] Substract mean images
+  - [ ] Normalization
 
 ## Wait for determining
 * [ ] Recurrent Neural Network?

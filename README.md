@@ -14,7 +14,8 @@
 - [ ] Have read all references?
 - [ ] Have determined the final architecture?
 - [ ] Starting coding?
-- [ ] Complete?
+- [ ] Release a demo?
+- [ ] Release the final version?
 
 ## Architecture
 * Deep learning framework: 

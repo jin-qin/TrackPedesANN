@@ -18,9 +18,15 @@
 - [ ] Release the final version?
 
 ## Architecture
-* Deep learning framework: 
+* Deep learning framework
   - [**`Tensorflow`**](https://github.com/tensorflow/tensorflow)(more flexible, slower) 
   - [**`Caffe`**](https://github.com/BVLC/caffe)(easier to use, faster)
+* Initialization Method
+  - [ ] Gaussian
+  - [ ] Orthogonal initialization
+  - [ ] LUSV initialization
+  - [ ] Xavier initialization
+  - [ ] Kaiming He initialization
 
 ## Wait for determining
 * [ ] Recurrent Neural Network?

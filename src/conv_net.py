@@ -75,7 +75,7 @@ class ConvolutionalNetwork:
 
 
     def conv2d(self, x, W):
-        return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding="SAME")
+        return tf.nn.conv2d(x, W, strides=[1, 5, 5, 1], padding="SAME")
 
     def max_pool_2x2(self, x):
         return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
@@ -91,6 +91,63 @@ class ConvolutionalNetwork:
 
         # runtime evaluation
         self.runtime_training_start = time.time()
+
+
+        ## NEW TRACKING BEGIN ####################################################
+
+
+        # TODO obtain image patches with dim_<xy>(<i>) = 48 x 128
+        X_previous
+        X_current
+
+
+        # X_<xy>[0] = R
+        # X_<xy>[1] = G
+        # X_<xy>[2] = B
+
+        # TODO normalize image patches
+
+        # TODO calculate gradients of gray scale images
+        # X_<xy>[3] = Dx
+        # X_<xy>[4] = Dy
+        self.number_of_input_channels = 5
+
+
+        # TODO Layer C1: convolutional layer with 10 feature maps
+        self.number_of_filters_conv1 = 1 # TODO value??
+        # TODO size of the feature maps is 44 x 124 px
+        self.conv_filter_width = 44
+        self.conv_filter_height = 124
+
+        W_conv, b_conv, h_pool = [], [], []
+        for i in range(self.number_of_input_channels):
+            with tf.name_scope("conv1_part{}".format(i + 1)):
+
+                single_image_channels = self.size_input[-1]
+                # TODO each unit in a feature map is connected to a 5x5 neighborhood in the input
+                W_conv1, b_conv1 = self.vars_W_b(
+                    [self.conv_filter_width, self.conv_filter_height, single_image_channels,
+                     self.number_of_filters_conv1])
+                W_conv.append(W_conv1)
+                b_conv.append(b_conv1)
+
+                if i < 5:
+                    xtemp = X_previous[i]
+                else:
+                    xtemp = X_current[i]
+
+                # TODO no activation function ??
+                #h_conv = tf.nn.relu(self.conv2d(xtemp, W_conv1) + b_conv1)
+                h_conv = self.conv2d(self.xtemp, W_conv1) + b_conv1
+
+            # TODO Layer S 1 is a pooling layer with 10 feature maps using max operation
+            # TODO use correct settings. more details in the paper
+            with tf.name_scope("pool{}".format(i + 1)):
+                h_pool.append(self.max_pool_2x2(h_conv))
+
+
+
+        ## NEW TRACKING END ######################################################
 
 
         # generate placeholders for images and labels

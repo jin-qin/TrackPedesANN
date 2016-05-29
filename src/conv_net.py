@@ -6,7 +6,7 @@ import time
 import os
 
 class ConvolutionalNetwork:
-    def __init__(self, Xtrain, Ytrain, Xval, Yval, size_output, min_max_scaling=True, standardization=True,
+    def __init__(self, Xtrain, Ytrain, Xval, Yval, min_max_scaling=True, standardization=True,
                  batch_size=200,
                  learning_rate=0.01,
                  size_full=300,
@@ -49,8 +49,6 @@ class ConvolutionalNetwork:
 
         # derive further params
 
-        self.size_output = size_output # assuming all labels are numbers from 0..max #use test data cause its unmodified
-
         # use original image shape, but resize the number of images to a single batch
         self.size_input = []
         orig_img_shape = tf.TensorShape(self.Xtrain.shape).as_list()
@@ -62,7 +60,6 @@ class ConvolutionalNetwork:
 
         log.log('.. Input dimension: {}.'.format(self.size_input))
         log.log( '.. Fully-connected layer dimension: {}.'.format(self.size_full) )
-        log.log('.. Output dimension: {}.'.format(self.size_output))
         # log.log( '.. Standard deviation W-init: {}.'.format(cf_standard_deviation_w_init) )
 
         # preprocessing (will change original data, too!)

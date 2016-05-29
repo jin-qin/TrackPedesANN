@@ -1,6 +1,5 @@
 import tensorflow as tf
-import data_utils as du
-import mnist_loader as ml
+import caltech_loader as cl
 import conv_net as cnn
 import log
 import numpy as np
@@ -10,7 +9,7 @@ import gc
 
 #cf = config
 #cfc = user config constant => do not change manually
-cf_dataset = 1 # 0 => MNIST, 1 => CIFAR-100
+cf_dataset = 0 # 0 => Caltech
 cf_timeout_minutes = 60 * 3 - 10 # maximum number of minutes used for training. 0=unlimited
 cf_min_max_scaling = True #turn on either this or cf_standardization
 cf_standardization = True #turn on either this or cf_min_max_scaling
@@ -34,9 +33,9 @@ cf_number_of_filters_conv1 = 16 # special number for very first convolution laye
 cf_number_of_filters_conv2 = 16 # if cf_number_of_conv_layers > 1, cf_number_of_filters_conv2 will be used for all layers > 1
 
 if cf_dataset == 0:
-    cfc_dataset_name = 'MNIST'
-else:
-    cfc_dataset_name = 'CIFAR-100'
+    cfc_dataset_name = 'Caltech'
+#else:
+#    cfc_dataset_name = 'CIFAR-100'
 
 
 def redo_finalize(Xtrain, Ytrain, Xval, Yval, saveLog):
@@ -161,21 +160,11 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
 
         log.log('Loading ' + cfc_dataset_name + ' dataset..')
         if(cf_dataset == 0):
-            cfc_datasetpath = os.path.join(cfc_datasetpath, "mnist")
-            (Xtrain, Ytrain, Xval, Yval, Xtest, Ytest) = ml.load_MNIST_data(cfc_datasetpath)
-            size_output = 10
-
-            # reshape => unflatten
-            mnist_dim = [-1, 28, 28, 1]
-            Xtrain = Xtrain.reshape(mnist_dim)
-            Xval = Xval.reshape(mnist_dim)
-            Xtest = Xtest.reshape(mnist_dim)
-        else:
-            cfc_datasetpath = os.path.join(cfc_datasetpath, "cifar-100-python")
-            Xall, Yall = du.load_CIFAR100_train(cfc_datasetpath)
-            size_output = 20
+            calLoader = cl.CaltechLoader(cfc_datasetpath)
+            Xall, Yall = cl.getTrainingData()
 
             # resample training data to gain validation dataset
+            # TODO set correct ratio and maybe move to CaltechLoader
             log.log(".. resampling training and validation data")
             indices = np.random.permutation(Xall.shape[0])
             train_ids, val_ids = indices[:45000], indices[45000:]
@@ -193,10 +182,12 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
         log.log('.. Validationset includes {} images.'.format(Xval.shape[0]))
 
 
+        # TODO go on here
+        exit()
+
 
         # Creating network
         net = cnn.ConvolutionalNetwork(Xtrain, Ytrain, Xval, Yval,
-                                       size_output,
                                        cf_min_max_scaling,
                                        cf_standardization,
                                        cf_batch_size,

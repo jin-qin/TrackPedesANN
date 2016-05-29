@@ -1,6 +1,7 @@
 import os
 import glob
 import json
+import gc
 from scipy.io import loadmat
 import cv2 as cv
 from collections import defaultdict
@@ -9,6 +10,9 @@ class CaltechLoader:
 
     def __init__(self, root_dir):
 
+        self.image_width = 48
+        self.image_height = 128
+        self.image_size_min_resize = self.image_width / 2 # minimum length of minimum-length image length to allow resizing
         self.input_dir = os.path.join(root_dir, "caltech")
         self.output_dir = os.path.join(self.input_dir, "cached")
 
@@ -97,10 +101,20 @@ class CaltechLoader:
         imagesets = sorted(glob.glob(os.path.join(self.input_dir, 'set*')))
         print(len(imagesets), " extracted image sets found")
 
+        self.trainingSamples = []
+
         for dname in imagesets:
             set_name = os.path.basename(dname)
+
+            print("Processing set ", set_name)
+
             for fn in sorted(glob.glob('{}/*.seq'.format(dname))):
                 video_name = os.path.splitext(os.path.basename(fn))[0]
+
+                print("Processing video ", set_name, video_name)
+
+                self.framePatches = defaultdict(dict)
+
                 cap = cv.VideoCapture(fn)
                 i = 0
                 while True:
@@ -108,12 +122,38 @@ class CaltechLoader:
                     if not ret:
                         break
 
+                    self.framePatches[i] = defaultdict(dict)
+
                     self.extractPedestriansFromImage(frame, set_name, video_name, i)
 
                     # TODO save original raw image on disk?
                     #self.save_img(dname, fn, i, frame)
 
                     i += 1
+
+
+                # after all frames of this video have been preprocessed, we can start creating pairs
+                print("Number of created training pairs:", len(self.trainingSamples))
+                print("Creating input sample pairs for ", set_name, video_name)
+                for frame_i, peds in self.framePatches.iteritems():
+
+                    if (frame_i > 0):
+                        for ped_id, ped_frame in peds.iteritems():
+
+                            try:
+                                prevFrame = self.framePatches[frame_i-1][ped_id]
+                            except (NameError, KeyError) as e:
+                                prevFrame = None
+
+                            # if current pedestrian does exist in previous frame, too
+                            # => save pair of frames as input data
+                            if prevFrame != None:
+                                self.trainingSamples.append([prevFrame, ped_frame])
+
+                del self.framePatches
+                gc.collect()
+
+
                 print(fn)
 
 
@@ -125,28 +165,51 @@ class CaltechLoader:
 
     def extractPedestriansFromImage(self, img, set_name, video_name, frame_i):
 
-        print("Extract pedestrians")
-
         # TODO when saving and loading json file before, we might need frame_i = str(frame_i)
 
         if frame_i in self.annotations[set_name][video_name]['frames']:
             data = self.annotations[set_name][
                 video_name]['frames'][frame_i]
+
             for datum in data:
+                ped_id = datum['id']
                 x, y, w, h = [int(v) for v in datum['pos']]
 
-                img_ped = img[y:y + h, x:x + w]
-                self.save_img(set_name, video_name, frame_i, img_ped)
+                # skip too small images
+                if not(w < self.image_size_min_resize or h < self.image_size_min_resize):
+                    img_ped = img[y:y + h, x:x + w]
+                    w_real = len(img_ped[0])
+                    h_real = len(img_ped)
+                    if not(w_real < self.image_size_min_resize or h_real < self.image_size_min_resize):
 
-                #cv.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 1)
-                #n_objects += 1
-            #wri.write(img)
+                        # resize all images
+                        # TODO check how to resize probably for different-ratio image patches
+                        resized_image = cv.resize(img_ped, (self.image_width, self.image_height))
+
+                        # TODO calculate gradients and manage memory resources
+                        #sobelx = cv.Sobel(img, cv.CV_64F, 1, 0, ksize=5)
+                        #sobely = cv.Sobel(img, cv.CV_64F, 0, 1, ksize=5)
+                        sobelx = None
+                        sobely = None
+
+                        # put everything together
+                        # TODO check rgb channel access
+                        inputSample = [resized_image[0],resized_image[1],resized_image[2],sobelx,sobely]
+
+                        # save it for further usage
+                        self.framePatches[frame_i][ped_id] = inputSample
+
+                        #self.save_img(set_name, video_name, frame_i, img_ped)
+
+                        #cv.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 1)
+                        #n_objects += 1
+                    #wri.write(img)
 
 
     def getTrainingData(self):
 
         # TODO get training data
-        Xall = None
+        Xall = self.trainingSamples
         Yall = None
         return Xall, Yall
 

@@ -241,7 +241,7 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
         redo_finalize(Xtrain, Ytrain, Xval, Yval, cf_log_auto_save)
 
     except Exception as e:
-        log.log("crash detected. auto repairing.. redo.. " , e)
+        log.log("crash detected. auto repairing.. redo.. " + e.message)
         i -= 1 # on error: redo this iteration
 
     i += 1

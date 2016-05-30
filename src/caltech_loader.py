@@ -195,14 +195,13 @@ class CaltechLoader:
 
 
         # add gradient channels
-        for i in range(len(self.trainingSamples)):
-            self.trainingSamples[i][0] = self.wrapImage(self.trainingSamples[i][0])
-            self.trainingSamples[i][1] = self.wrapImage(self.trainingSamples[i][1])
+        for i in range(len(self.trainingSamples)): #indexes 0-4: previous image. 5-9:current image
+            self.trainingSamples[i] = self.wrapImage(self.trainingSamples[i][0]).append(self.wrapImage(self.trainingSamples[i][1]))
 
         print("Finished gradient calculations.")
 
         # convert to np
-        self.trainingSamples = np.asarray(self.trainingSamples)
+        self.trainingSamples = np.asarray(self.trainingSamples, np.float16)
 
         if training:
             name = "caltech-training.p"
@@ -221,6 +220,16 @@ class CaltechLoader:
 
         print("finished")
 
+    def split_into_rgb_channels(self, image):
+        '''Split the target image into its red, green and blue channels.
+        image - a numpy array of shape (rows, columns, 3).
+        output - three numpy arrays of shape (rows, columns) and dtype same as
+                 image, containing the corresponding channels.
+        '''
+        red = image[:, :, 2]
+        green = image[:, :, 1]
+        blue = image[:, :, 0]
+        return red, green, blue
 
     def wrapImage(self, img):
         gray_image = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
@@ -228,8 +237,8 @@ class CaltechLoader:
         sobely = cv.Sobel(gray_image, cv.CV_16S, 0, 1, ksize=5) #y
 
         # put everything together
-        # TODO check rgb channel access
-        inputSample = [img[0], img[1], img[2], sobelx, sobely]
+        red, green, blue = self.split_into_rgb_channels(img)
+        inputSample = [red, green, blue, sobelx, sobely]
 
         return inputSample
 

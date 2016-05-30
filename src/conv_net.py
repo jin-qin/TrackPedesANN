@@ -95,8 +95,8 @@ class ConvolutionalNetwork:
 
 
         # TODO obtain image patches with dim_<xy>(<i>) = 48 x 128
-        self.placeholder_X_previous = tf.placeholder(tf.float32, shape=(48,128), name="x_previous")
-        self.placeholder_X_current = tf.placeholder(tf.float32, shape=(48, 128), name="x_current")
+        # indexes 0-4: previous image. 5-9:current image
+        self.placeholder_images = tf.placeholder(tf.float16, shape=self.size_input, name="x_images")
 
 
         # X_<xy>[0] = R
@@ -108,7 +108,7 @@ class ConvolutionalNetwork:
         # TODO calculate gradients of gray scale images
         # X_<xy>[3] = Dx
         # X_<xy>[4] = Dy
-        self.number_of_input_channels = 5
+        self.number_of_input_channels = 10
 
 
         # TODO Layer C1: convolutional layer with 10 feature maps
@@ -129,14 +129,9 @@ class ConvolutionalNetwork:
                 W_conv.append(W_conv1)
                 b_conv.append(b_conv1)
 
-                if i < 5:
-                    xtemp = self.placeholder_X_previous[i]
-                else:
-                    xtemp = self.placeholder_X_current[i]
-
                 # TODO no activation function ??
                 #h_conv = tf.nn.relu(self.conv2d(xtemp, W_conv1) + b_conv1)
-                h_conv = self.conv2d(self.xtemp, W_conv1) + b_conv1
+                h_conv = self.conv2d(self.placeholder_images[i], W_conv1) + b_conv1
 
             # TODO Layer S 1 is a pooling layer with 10 feature maps using max operation
             # TODO use correct settings. more details in the paper

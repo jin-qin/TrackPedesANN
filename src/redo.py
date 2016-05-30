@@ -1,4 +1,4 @@
-import tensorflow as tf
+#import tensorflow as tf
 import caltech_loader as cl
 import conv_net as cnn
 import log
@@ -44,7 +44,9 @@ def redo_finalize(Xtrain, Ytrain, Xval, Yval, saveLog):
 
     # if not already done, load test data
     if (cf_dataset != 0):
-        Xtest, Ytest = du.load_CIFAR100_test(cfc_datasetpath)
+        calLoader = cl.CaltechLoader(cfc_datasetpath)
+        Xtest, Ytest = calLoader.getTestData()
+
         log.log('Loaded testset, which includes {} images.'.format(Xtest.shape[0]))
         net.preprocessData(Xtest)
 
@@ -161,13 +163,13 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
         log.log('Loading ' + cfc_dataset_name + ' dataset..')
         if(cf_dataset == 0):
             calLoader = cl.CaltechLoader(cfc_datasetpath)
-            Xall, Yall = cl.getTrainingData()
+            Xall, Yall = calLoader.getTrainingData()
 
             # resample training data to gain validation dataset
             # TODO set correct ratio and maybe move to CaltechLoader
             log.log(".. resampling training and validation data")
             indices = np.random.permutation(Xall.shape[0])
-            train_ids, val_ids = indices[:45000], indices[45000:]
+            train_ids, val_ids = indices[:4000], indices[4000:] #TODO fix params when changing dataset size
             Xtrain, Xval = Xall[train_ids, :], Xall[val_ids, :]
             Ytrain = Yall[train_ids]
             Yval = Yall[val_ids]
@@ -180,11 +182,6 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
         log.log('.. Trainingset includes {} images.'.format(Xtrain.shape[0]))
 
         log.log('.. Validationset includes {} images.'.format(Xval.shape[0]))
-
-
-        # TODO go on here
-        exit()
-
 
         # Creating network
         net = cnn.ConvolutionalNetwork(Xtrain, Ytrain, Xval, Yval,
@@ -243,8 +240,8 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
 
         redo_finalize(Xtrain, Ytrain, Xval, Yval, cf_log_auto_save)
 
-    except Exception:
-        log.log("crash detected. auto repairing.. redo.. " + Exception)
+    except Exception as e:
+        log.log("crash detected. auto repairing.. redo.. " , e)
         i -= 1 # on error: redo this iteration
 
     i += 1

@@ -18,19 +18,29 @@ class CaltechLoader:
         self.input_dir = os.path.join(root_dir, "caltech")
         self.output_dir = os.path.join(self.input_dir, "cached")
 
+    def loadDataSet(self,training):
+
+        if training:
+            name = "caltech-training.p"
+        else:
+            name = "caltech-test.p"
+
         # if no data has been generated yet, generate it once
-        cache_file = os.path.join(self.output_dir, "caltech.p")
-        if not os.path.exists(cache_file):
+        cache_file = os.path.join(self.output_dir, name)
+        if True or not os.path.exists(cache_file): #TODO remove True or to enable caching again
             print("No cached dataset has been found. Generate it once.")
             # TODO do we need to normalize the images to set the face to a specific position??
             self.loadAnnotations()
-            self.loadImages()
+            self.loadImages(training)
         else:
             print("Cached caltech dataset has been found. Start loading..")
-            self.trainingSamples = pickle.load(open(cache_file, "rb"))
+
+            if training:
+                self.trainingSamples = pickle.load(open(cache_file, "rb"))
+            else:
+                self.testSamples = pickle.load(open(cache_file, "rb"))
+
             print("Finished cached data import.")
-
-
 
     # loads all annotations to self.annotations
     # original source: https://github.com/mitmul/caltech-pedestrian-dataset-converter/blob/master/scripts/convert_annotations.py
@@ -40,6 +50,7 @@ class CaltechLoader:
         self.annotations = defaultdict(dict)
         for dname in sorted(glob.glob(os.path.join(self.input_dir, 'annotations/set*'))):
             set_name = os.path.basename(dname)
+            print("Annotations from set", set_name)
             self.annotations[set_name] = defaultdict(dict)
             for anno_fn in sorted(glob.glob('{}/*.vbb'.format(dname))):
                 vbb = loadmat(anno_fn)
@@ -86,7 +97,7 @@ class CaltechLoader:
                                 'frames'][frame_id].append(datum)
                             n_obj += 1
 
-                print(set_name, video_name, n_obj)
+
                 all_obj += n_obj
 
         print('Number of objects:', all_obj)
@@ -96,7 +107,7 @@ class CaltechLoader:
 
 
     # original source: https://github.com/mitmul/caltech-pedestrian-dataset-converter/blob/master/scripts/convert_seqs.py
-    def loadImages(self):
+    def loadImages(self, training): # TODO implement training parameter to support loading of test data, too
 
         print("extracting frames")
 
@@ -150,6 +161,12 @@ class CaltechLoader:
 
                 # after all frames of this video have been preprocessed, we can start creating pairs
                 print("Number of created training pairs:", len(self.trainingSamples))
+
+                # TODO remove temp code: currently only max 5000 pairs for speed up during development
+                if len(self.trainingSamples) > 5000:
+                    print("FORCE STOP");
+                    break
+
                 print("Creating input sample pairs for ", set_name, video_name)
                 for frame_i, peds in self.framePatches.iteritems():
 
@@ -184,9 +201,23 @@ class CaltechLoader:
 
         print("Finished gradient calculations.")
 
+        # convert to np
+        self.trainingSamples = np.asarray(self.trainingSamples)
+
+        if training:
+            name = "caltech-training.p"
+        else:
+            name = "caltech-test.p"
+
         # saving data to file
-        print("saving data to file")
-        pickle.dump(self.trainingSamples, open(os.path.join(self.output_dir, "caltech.p"), "wb"))
+        if False: #TODO activate again
+            print("saving data to file")
+            pickle.dump(self.trainingSamples, open(os.path.join(self.output_dir, name), "wb"))
+
+        # TODO find better solution for test data fix
+        if not training:
+            self.testSamples = self.trainingSamples
+            self.trainingSamples = None
 
         print("finished")
 
@@ -246,9 +277,22 @@ class CaltechLoader:
 
     def getTrainingData(self):
 
+        # TODO call only once
+        self.loadDataSet(True)
+
         # TODO get training data
         Xall = self.trainingSamples
-        Yall = None
+        Yall = Xall # TODO calculate correct Yall
+        return Xall, Yall
+
+    def getTestData(self):
+
+        # TODO call only once
+        self.loadDataSet(False)
+
+        # TODO get training data
+        Xall = self.testSamples
+        Yall = None # TODO calculate correct Yall
         return Xall, Yall
 
 

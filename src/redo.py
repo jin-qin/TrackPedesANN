@@ -118,130 +118,130 @@ eval_i_max = len(testvals[1])
 i=0
 while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside the loop
 
+    #try: #TODO
+
+    # Loading data
+    log.log('###############################################################')
+    log.log('########################  BEGIN  ##############################')
+
+    if(testvals[0] != ""):
+
+        log.log('DEBUG param ' + testvals[0] + " ({})".format(testvals[1][i]))
+        cf_log_dir = os.path.join(cf_log_dir_init, testvals[0]) # save param evals in extra folder
+
+        if testvals[0] == "cf_regularization_strength":
+            cf_regularization_strength = testvals[1][i]
+        elif testvals[0] == "cf_learning_rate":
+            cf_learning_rate = testvals[1][i]
+        elif testvals[0] == "cf_conv_filter_size":
+            cf_conv_filter_size = testvals[1][i]
+        elif testvals[0] == "cf_number_of_filters_conv_both":
+            cf_number_of_filters_conv1 = testvals[1][i]
+            cf_number_of_filters_conv2 = testvals[1][i]
+        elif testvals[0] == "cf_number_of_filters_conv1":
+            cf_number_of_filters_conv1 = testvals[1][i]
+        elif testvals[0] == "cf_number_of_filters_conv2":
+            cf_number_of_filters_conv2 = testvals[1][i]
+        elif testvals[0] == "cf_number_of_conv_layers":
+            cf_number_of_conv_layers = testvals[1][i]
+        elif testvals[0] == "cf_dropout_rate":
+            cf_dropout_rate = testvals[1][i]
+        elif testvals[0] == "cf_optimizer":
+            cf_optimizer = testvals[1][i]
+        elif testvals[0] == "cf_size_fully_connected_layer":
+            cf_size_fully_connected_layer = testvals[1][i]
+
+
+
+    if len(sys.argv) == 1:
+        # use default file path
+        cfc_datasetpath = "/media/th/6C4C-2ECD/ml_datasets"
+    else:
+        #use user specified file path
+        cfc_datasetpath = sys.argv[1]
+
+    log.log('Loading ' + cfc_dataset_name + ' dataset..')
+    if(cf_dataset == 0):
+        calLoader = cl.CaltechLoader(cfc_datasetpath)
+        Xall, Yall = calLoader.getTrainingData()
+
+        # resample training data to gain validation dataset
+        # TODO set correct ratio and maybe move to CaltechLoader
+        log.log(".. resampling training and validation data")
+        indices = np.random.permutation(Xall.shape[0])
+        train_ids, val_ids = indices[:4000], indices[4000:] #TODO fix params when changing dataset size
+        Xtrain, Xval = Xall[train_ids, :], Xall[val_ids, :]
+        Ytrain = Yall[train_ids]
+        Yval = Yall[val_ids]
+
+        del Xall
+        del Yall
+        gc.collect()
+
+
+    log.log('.. Trainingset includes {} images.'.format(Xtrain.shape[0]))
+
+    log.log('.. Validationset includes {} images.'.format(Xval.shape[0]))
+
+    # Creating network
+    net = cnn.ConvolutionalNetwork(Xtrain, Ytrain, Xval, Yval,
+                                   cf_min_max_scaling,
+                                   cf_standardization,
+                                   cf_batch_size,
+                                   cf_learning_rate,
+                                   cf_size_fully_connected_layer,
+                                   cf_num_iters,
+                                   cf_regularization_strength,
+                                   cf_learning_rate_decay,
+                                   cf_momentum,
+                                   cf_timeout_minutes,
+                                   cf_conv_filter_size,
+                                   cf_number_of_filters_conv1,
+                                   cf_number_of_filters_conv2,
+                                   cf_log_dir,
+                                   cf_number_of_conv_layers,
+                                   cf_dropout_rate,
+                                   cf_optimizer)
+
+    # Training
+    log.log('Start Training..')
+    log.log('.. timeout after {} minutes'.format(cf_timeout_minutes))
+    log.log('.. learning rate: {}'.format(cf_learning_rate))
+    log.log('.. learning rate decay: {}'.format(cf_learning_rate_decay))
+    log.log('.. L2 regularization active: {}'.format(cf_regularization_strength != 0))
+    if cf_regularization_strength != 0:
+        log.log('.. L2 regularization strength: {}'.format(cf_regularization_strength))
+    log.log('.. drop out active: {}'.format(cf_dropout_rate > 0 and cf_dropout_rate < 1))
+    if cf_dropout_rate > 0 and cf_dropout_rate < 1:
+        log.log('.. drop out rate: {}'.format(cf_dropout_rate))
+    log.log('.. total number of iterations: {}'.format(cf_num_iters))
+    log.log('.. batch size in each iteration: {}'.format(cf_batch_size))
+    log.log('.. apply standardization (mean + std): {}'.format(cf_standardization))
+    log.log('.. min-max-scaling: {}'.format(cf_min_max_scaling))
+    log.log('.. momentum update: {}'.format(cf_momentum))
+
+    log.log('.. number of convolutional layers: {}'.format(cf_number_of_conv_layers))
+    log.log('.. number of filters in first convolutional layer: {}'.format(cf_number_of_filters_conv1))
+    log.log('.. number of filters in following convolutional layer: {}'.format(cf_number_of_filters_conv2))
+
+
     try:
+        net.train()
+    except KeyboardInterrupt:
+        log.log("WARNING: User interrupted progess. Saving latest results.")
 
-        # Loading data
-        log.log('###############################################################')
-        log.log('########################  BEGIN  ##############################')
-
-        if(testvals[0] != ""):
-
-            log.log('DEBUG param ' + testvals[0] + " ({})".format(testvals[1][i]))
-            cf_log_dir = os.path.join(cf_log_dir_init, testvals[0]) # save param evals in extra folder
-
-            if testvals[0] == "cf_regularization_strength":
-                cf_regularization_strength = testvals[1][i]
-            elif testvals[0] == "cf_learning_rate":
-                cf_learning_rate = testvals[1][i]
-            elif testvals[0] == "cf_conv_filter_size":
-                cf_conv_filter_size = testvals[1][i]
-            elif testvals[0] == "cf_number_of_filters_conv_both":
-                cf_number_of_filters_conv1 = testvals[1][i]
-                cf_number_of_filters_conv2 = testvals[1][i]
-            elif testvals[0] == "cf_number_of_filters_conv1":
-                cf_number_of_filters_conv1 = testvals[1][i]
-            elif testvals[0] == "cf_number_of_filters_conv2":
-                cf_number_of_filters_conv2 = testvals[1][i]
-            elif testvals[0] == "cf_number_of_conv_layers":
-                cf_number_of_conv_layers = testvals[1][i]
-            elif testvals[0] == "cf_dropout_rate":
-                cf_dropout_rate = testvals[1][i]
-            elif testvals[0] == "cf_optimizer":
-                cf_optimizer = testvals[1][i]
-            elif testvals[0] == "cf_size_fully_connected_layer":
-                cf_size_fully_connected_layer = testvals[1][i]
-
-
-
-        if len(sys.argv) == 1:
-            # use default file path
-            cfc_datasetpath = "/media/th/6C4C-2ECD/ml_datasets"
+        finalizeAndSave = input("Do you want to save the latest data? [y/n]")
+        if finalizeAndSave != "n":
+            log.log("Saving latest results.")
+            redo_finalize(Xtrain, Ytrain, Xval, Yval, True)
+            sys.exit()
         else:
-            #use user specified file path
-            cfc_datasetpath = sys.argv[1]
+            log.log("Results deleted.")
 
-        log.log('Loading ' + cfc_dataset_name + ' dataset..')
-        if(cf_dataset == 0):
-            calLoader = cl.CaltechLoader(cfc_datasetpath)
-            Xall, Yall = calLoader.getTrainingData()
+    redo_finalize(Xtrain, Ytrain, Xval, Yval, cf_log_auto_save)
 
-            # resample training data to gain validation dataset
-            # TODO set correct ratio and maybe move to CaltechLoader
-            log.log(".. resampling training and validation data")
-            indices = np.random.permutation(Xall.shape[0])
-            train_ids, val_ids = indices[:4000], indices[4000:] #TODO fix params when changing dataset size
-            Xtrain, Xval = Xall[train_ids, :], Xall[val_ids, :]
-            Ytrain = Yall[train_ids]
-            Yval = Yall[val_ids]
-
-            del Xall
-            del Yall
-            gc.collect()
-
-
-        log.log('.. Trainingset includes {} images.'.format(Xtrain.shape[0]))
-
-        log.log('.. Validationset includes {} images.'.format(Xval.shape[0]))
-
-        # Creating network
-        net = cnn.ConvolutionalNetwork(Xtrain, Ytrain, Xval, Yval,
-                                       cf_min_max_scaling,
-                                       cf_standardization,
-                                       cf_batch_size,
-                                       cf_learning_rate,
-                                       cf_size_fully_connected_layer,
-                                       cf_num_iters,
-                                       cf_regularization_strength,
-                                       cf_learning_rate_decay,
-                                       cf_momentum,
-                                       cf_timeout_minutes,
-                                       cf_conv_filter_size,
-                                       cf_number_of_filters_conv1,
-                                       cf_number_of_filters_conv2,
-                                       cf_log_dir,
-                                       cf_number_of_conv_layers,
-                                       cf_dropout_rate,
-                                       cf_optimizer)
-
-        # Training
-        log.log('Start Training..')
-        log.log('.. timeout after {} minutes'.format(cf_timeout_minutes))
-        log.log('.. learning rate: {}'.format(cf_learning_rate))
-        log.log('.. learning rate decay: {}'.format(cf_learning_rate_decay))
-        log.log('.. L2 regularization active: {}'.format(cf_regularization_strength != 0))
-        if cf_regularization_strength != 0:
-            log.log('.. L2 regularization strength: {}'.format(cf_regularization_strength))
-        log.log('.. drop out active: {}'.format(cf_dropout_rate > 0 and cf_dropout_rate < 1))
-        if cf_dropout_rate > 0 and cf_dropout_rate < 1:
-            log.log('.. drop out rate: {}'.format(cf_dropout_rate))
-        log.log('.. total number of iterations: {}'.format(cf_num_iters))
-        log.log('.. batch size in each iteration: {}'.format(cf_batch_size))
-        log.log('.. apply standardization (mean + std): {}'.format(cf_standardization))
-        log.log('.. min-max-scaling: {}'.format(cf_min_max_scaling))
-        log.log('.. momentum update: {}'.format(cf_momentum))
-
-        log.log('.. number of convolutional layers: {}'.format(cf_number_of_conv_layers))
-        log.log('.. number of filters in first convolutional layer: {}'.format(cf_number_of_filters_conv1))
-        log.log('.. number of filters in following convolutional layer: {}'.format(cf_number_of_filters_conv2))
-
-
-        try:
-            net.train()
-        except KeyboardInterrupt:
-            log.log("WARNING: User interrupted progess. Saving latest results.")
-
-            finalizeAndSave = input("Do you want to save the latest data? [y/n]")
-            if finalizeAndSave != "n":
-                log.log("Saving latest results.")
-                redo_finalize(Xtrain, Ytrain, Xval, Yval, True)
-                sys.exit()
-            else:
-                log.log("Results deleted.")
-
-        redo_finalize(Xtrain, Ytrain, Xval, Yval, cf_log_auto_save)
-
-    except Exception as e:
-        log.log("crash detected. auto repairing.. redo.. " + e.message)
-        i -= 1 # on error: redo this iteration
+    #except Exception as e:  #TODO
+    #    log.log("crash detected. auto repairing.. redo.. " + e.message)
+    #    i -= 1 # on error: redo this iteration
 
     i += 1

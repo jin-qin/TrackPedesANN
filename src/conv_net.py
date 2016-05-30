@@ -96,56 +96,58 @@ class ConvolutionalNetwork:
         ## NEW TRACKING BEGIN ####################################################
 
 
-        # input data: batch of image-patches pairs with image size = 48 x 128
-        # input dim = <batch_size>, <channels=10>, <image_height=128>, <image_width=48>
-        # TODO need to flip the image? currently the image format is the one of opencv
+        # input data: two batches of images. equal indices of the two batches must form valid pairs.
+        # e.g. x_previous[i] and x_current[i] a one valid frame pair. Each image has the size = 48 x 128.
+        # Each pixel got 5 channels: R, G, B, Dx, Dy
+        # dims(self.x_previous) = dims(self.x_current) = <batch_size>, <image_height=128>, <image_width=48>, <channels=5>
+        # reminder: "image is flipped": the image format is the one of opencv
         #       => <number_of_rows> x <number_of_cols> = 128 x 48
-        # indexes 0-4: previous image. 5-9:current image
-        self.placeholder_images = tf.placeholder(tf.float16, shape=self.size_input, name="x_images")
-
-        self.number_of_input_channels = 10
-        # self.placeholder_images<image_nr>[0] = R [frame t-1]
-        # self.placeholder_images<image_nr>[1] = G [frame t-1]
-        # self.placeholder_images<image_nr>[2] = B [frame t-1]
-        # self.placeholder_images<image_nr>[3] = Dx [frame t-1]
-        # self.placeholder_images<image_nr>[4] = Dy [frame t-1]
-        # self.placeholder_images<image_nr>[5] = R [frame t]
-        # self.placeholder_images<image_nr>[6] = G [frame t]
-        # self.placeholder_images<image_nr>[7] = B [frame t]
-        # self.placeholder_images<image_nr>[8] = Dx [frame t]
-        # self.placeholder_images<image_nr>[9] = Dy [frame t]
+        #       => this is exactly what we need as the required input tensors need to be: [batch, in_height, in_width, in_channels]
+        self.x_previous = tf.placeholder(tf.float32, shape=self.size_input, name="x_images")
+        self.x_current = tf.placeholder(tf.float32, shape=self.size_input, name="x_images")
 
 
-        # TODO Layer C1: convolutional layer with 10 feature maps
+        # Layer C1: convolutional layer with 10 feature maps
+        # each feature map will be created independently
         # number of feature maps (=number of filters) in the complete conv layer C1: 10
         # => define either all at once with number of filters = 10
         # => OR define 10 times a partially-connected conv layer with number of filters (in each) layer = 1
         # size of a single filter: 5x5 (neighborhood used as input)
         # output size of the feature map must be 44 x 124px
+        self.conv1_independent_parts = 10
         self.number_of_filters_conv1 = 1
         self.conv_filter_width = 5
         self.conv_filter_height = 5
+        single_image_channels = self.size_input[-1]  # 5
 
         W_conv, b_conv, h_pool = [], [], []
-        for i in range(self.number_of_input_channels):
-            with tf.name_scope("conv1_part{}".format(i + 1)):
+        for i in range(self.conv1_independent_parts):
+            with tf.name_scope("C1_part{}".format(i + 1)):
 
-                single_image_channels = self.size_input[-1]
-                # TODO each unit in a feature map is connected to a 5x5 neighborhood in the input
                 W_conv1, b_conv1 = self.vars_W_b(
-                    [self.conv_filter_width, self.conv_filter_height, single_image_channels,
+                    [self.conv_filter_height, self.conv_filter_width, single_image_channels,
                      self.number_of_filters_conv1])
                 W_conv.append(W_conv1)
                 b_conv.append(b_conv1)
 
-                # TODO no activation function ??
-                #h_conv = tf.nn.relu(self.conv2d(xtemp, W_conv1) + b_conv1)
-                # input tensor must have the following form: [batch, in_height, in_width, in_channels]
-                h_conv = self.conv2d(self.placeholder_images[i], W_conv1) + b_conv1
+                # the very first 5 feature maps are using the previous image only
+                # the remaining 5 feature maps are using the current image only
+                if i < 5:
+                    input_source = self.x_previous
+                else:
+                    input_source = self.x_current
 
-            # TODO Layer S 1 is a pooling layer with 10 feature maps using max operation
-            # TODO use correct settings. more details in the paper
-            with tf.name_scope("pool{}".format(i + 1)):
+                # build actual (part of) convolutional layer
+                # TODO no activation function ?? e.g.: h_conv = tf.nn.relu(h_conv)
+                h_conv = self.conv2d(input_source, W_conv1) + b_conv1
+
+            # Layer S1 is a pooling layer with 10 feature maps using max operation
+            # each of this feature maps is only connected to exactly one particular
+            # feature map of C1. So we can just connect each part of C1 right after
+            # creating to the corresponding part of S1
+            # => 2x2 pooling (as only 4 values are used)
+            # TODO ensure that those params are equivalent to the given formula in the paper (they should fit)
+            with tf.name_scope("S1_part{}".format(i + 1)):
                 h_pool.append(self.max_pool_2x2(h_conv))
 
 

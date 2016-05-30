@@ -196,7 +196,7 @@ class CaltechLoader:
 
         # add gradient channels
         for i in range(len(self.trainingSamples)): #indexes 0-4: previous image. 5-9:current image
-            self.trainingSamples[i] = self.wrapImage(self.trainingSamples[i][0]).append(self.wrapImage(self.trainingSamples[i][1]))
+            self.trainingSamples[i] = np.append(self.wrapImage(self.trainingSamples[i][0]), self.wrapImage(self.trainingSamples[i][1]), axis=0)
 
         print("Finished gradient calculations.")
 
@@ -238,7 +238,7 @@ class CaltechLoader:
 
         # put everything together
         red, green, blue = self.split_into_rgb_channels(img)
-        inputSample = [red, green, blue, sobelx, sobely]
+        inputSample = np.array([red, green, blue, sobelx, sobely])
 
         return inputSample
 

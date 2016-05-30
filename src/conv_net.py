@@ -94,21 +94,24 @@ class ConvolutionalNetwork:
         ## NEW TRACKING BEGIN ####################################################
 
 
-        # TODO obtain image patches with dim_<xy>(<i>) = 48 x 128
+        # input data: batch of image-patches pairs with image size = 48 x 128
+        # input dim = <batch_size>, <channels=10>, <image_height=128>, <image_width=48>
+        # TODO need to flip the image? currently the image format is the one of opencv
+        #       => <number_of_rows> x <number_of_cols> = 128 x 48
         # indexes 0-4: previous image. 5-9:current image
         self.placeholder_images = tf.placeholder(tf.float16, shape=self.size_input, name="x_images")
 
-
-        # X_<xy>[0] = R
-        # X_<xy>[1] = G
-        # X_<xy>[2] = B
-
-        # TODO normalize image patches
-
-        # TODO calculate gradients of gray scale images
-        # X_<xy>[3] = Dx
-        # X_<xy>[4] = Dy
         self.number_of_input_channels = 10
+        # self.placeholder_images<image_nr>[0] = R [frame t-1]
+        # self.placeholder_images<image_nr>[1] = G [frame t-1]
+        # self.placeholder_images<image_nr>[2] = B [frame t-1]
+        # self.placeholder_images<image_nr>[3] = Dx [frame t-1]
+        # self.placeholder_images<image_nr>[4] = Dy [frame t-1]
+        # self.placeholder_images<image_nr>[5] = R [frame t]
+        # self.placeholder_images<image_nr>[6] = G [frame t]
+        # self.placeholder_images<image_nr>[7] = B [frame t]
+        # self.placeholder_images<image_nr>[8] = Dx [frame t]
+        # self.placeholder_images<image_nr>[9] = Dy [frame t]
 
 
         # TODO Layer C1: convolutional layer with 10 feature maps

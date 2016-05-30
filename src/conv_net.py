@@ -69,6 +69,7 @@ class ConvolutionalNetwork:
             self.preprocessData(Xtrain)
             self.preprocessData(Xval)
             #self.preprocessData(Xtest)
+        log.log(".. finished preprocessing data")
 
 
     def conv2d(self, x, W):
@@ -94,8 +95,8 @@ class ConvolutionalNetwork:
 
 
         # TODO obtain image patches with dim_<xy>(<i>) = 48 x 128
-        X_previous
-        X_current
+        self.placeholder_X_previous = tf.placeholder(tf.float32, shape=(48,128), name="x_previous")
+        self.placeholder_X_current = tf.placeholder(tf.float32, shape=(48, 128), name="x_current")
 
 
         # X_<xy>[0] = R
@@ -129,9 +130,9 @@ class ConvolutionalNetwork:
                 b_conv.append(b_conv1)
 
                 if i < 5:
-                    xtemp = X_previous[i]
+                    xtemp = self.placeholder_X_previous[i]
                 else:
-                    xtemp = X_current[i]
+                    xtemp = self.placeholder_X_current[i]
 
                 # TODO no activation function ??
                 #h_conv = tf.nn.relu(self.conv2d(xtemp, W_conv1) + b_conv1)

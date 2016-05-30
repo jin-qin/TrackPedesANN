@@ -5,6 +5,8 @@ import gc
 from scipy.io import loadmat
 import cv2 as cv
 from collections import defaultdict
+import numpy as np
+import cPickle as pickle
 
 class CaltechLoader:
 
@@ -17,13 +19,17 @@ class CaltechLoader:
         self.output_dir = os.path.join(self.input_dir, "cached")
 
         # if no data has been generated yet, generate it once
-        # TODO remove "True or"
-        if True or not os.path.exists(self.output_dir):
+        cache_file = os.path.join(self.output_dir, "caltech.p")
+        if not os.path.exists(cache_file):
             print("No cached dataset has been found. Generate it once.")
+            # TODO do we need to normalize the images to set the face to a specific position??
             self.loadAnnotations()
             self.loadImages()
         else:
-            print("Cached caltech dataset has been found.")
+            print("Cached caltech dataset has been found. Start loading..")
+            self.trainingSamples = pickle.load(open(cache_file, "rb"))
+            print("Finished cached data import.")
+
 
 
     # loads all annotations to self.annotations
@@ -99,11 +105,21 @@ class CaltechLoader:
             os.makedirs(self.output_dir)
 
         imagesets = sorted(glob.glob(os.path.join(self.input_dir, 'set*')))
-        print(len(imagesets), " extracted image sets found")
+
+
+        image_folders_only = []
+        for dname in imagesets:
+            if os.path.isdir(dname):
+                image_folders_only.append(dname)
+
+        print(len(image_folders_only), " extracted image sets found")
+        skipped = len(imagesets) - len(image_folders_only)
+        if skipped > 0:
+            print(skipped, " further files skipped. Forgot to extract?")
 
         self.trainingSamples = []
 
-        for dname in imagesets:
+        for dname in image_folders_only:
             set_name = os.path.basename(dname)
 
             print("Processing set ", set_name)
@@ -147,7 +163,7 @@ class CaltechLoader:
 
                             # if current pedestrian does exist in previous frame, too
                             # => save pair of frames as input data
-                            if prevFrame != None:
+                            if prevFrame != None and len(prevFrame) > 1: #last condition to skip empty dictionarys
                                 self.trainingSamples.append([prevFrame, ped_frame])
 
                 del self.framePatches
@@ -156,6 +172,35 @@ class CaltechLoader:
 
                 print(fn)
 
+
+        print("Finished frame extraction and matching.")
+        print("Calculate additional gradient channels")
+
+
+        # add gradient channels
+        for i in range(len(self.trainingSamples)):
+            self.trainingSamples[i][0] = self.wrapImage(self.trainingSamples[i][0])
+            self.trainingSamples[i][1] = self.wrapImage(self.trainingSamples[i][1])
+
+        print("Finished gradient calculations.")
+
+        # saving data to file
+        print("saving data to file")
+        pickle.dump(self.trainingSamples, open(os.path.join(self.output_dir, "caltech.p"), "wb"))
+
+        print("finished")
+
+
+    def wrapImage(self, img):
+        gray_image = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+        sobelx = cv.Sobel(gray_image, cv.CV_16S, 1, 0, ksize=5) #x
+        sobely = cv.Sobel(gray_image, cv.CV_16S, 0, 1, ksize=5) #y
+
+        # put everything together
+        # TODO check rgb channel access
+        inputSample = [img[0], img[1], img[2], sobelx, sobely]
+
+        return inputSample
 
     def save_img(self, dname, fn, i, frame):
         cv.imwrite('{}/{}_{}_{}.png'.format(
@@ -186,18 +231,11 @@ class CaltechLoader:
                         # TODO check how to resize probably for different-ratio image patches
                         resized_image = cv.resize(img_ped, (self.image_width, self.image_height))
 
-                        # TODO calculate gradients and manage memory resources
-                        #sobelx = cv.Sobel(img, cv.CV_64F, 1, 0, ksize=5)
-                        #sobely = cv.Sobel(img, cv.CV_64F, 0, 1, ksize=5)
-                        sobelx = None
-                        sobely = None
-
-                        # put everything together
-                        # TODO check rgb channel access
-                        inputSample = [resized_image[0],resized_image[1],resized_image[2],sobelx,sobely]
+                        if type(resized_image) != np.ndarray:
+                            print("Hugh?")
 
                         # save it for further usage
-                        self.framePatches[frame_i][ped_id] = inputSample
+                        self.framePatches[frame_i][ped_id] = resized_image
 
                         #self.save_img(set_name, video_name, frame_i, img_ped)
 

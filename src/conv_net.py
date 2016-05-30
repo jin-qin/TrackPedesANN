@@ -73,7 +73,9 @@ class ConvolutionalNetwork:
 
 
     def conv2d(self, x, W):
-        return tf.nn.conv2d(x, W, strides=[1, 5, 5, 1], padding="SAME")
+        # keep strides=[1, 1, 1, 1] to copy filter to all possible positions.
+        # parameters got nothing to do with the size of the used neighborhood
+        return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding="SAME")
 
     def max_pool_2x2(self, x):
         return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
@@ -115,10 +117,14 @@ class ConvolutionalNetwork:
 
 
         # TODO Layer C1: convolutional layer with 10 feature maps
-        self.number_of_filters_conv1 = 1 # TODO value??
-        # TODO size of the feature maps is 44 x 124 px
-        self.conv_filter_width = 44
-        self.conv_filter_height = 124
+        # number of feature maps (=number of filters) in the complete conv layer C1: 10
+        # => define either all at once with number of filters = 10
+        # => OR define 10 times a partially-connected conv layer with number of filters (in each) layer = 1
+        # size of a single filter: 5x5 (neighborhood used as input)
+        # output size of the feature map must be 44 x 124px
+        self.number_of_filters_conv1 = 1
+        self.conv_filter_width = 5
+        self.conv_filter_height = 5
 
         W_conv, b_conv, h_pool = [], [], []
         for i in range(self.number_of_input_channels):
@@ -134,6 +140,7 @@ class ConvolutionalNetwork:
 
                 # TODO no activation function ??
                 #h_conv = tf.nn.relu(self.conv2d(xtemp, W_conv1) + b_conv1)
+                # input tensor must have the following form: [batch, in_height, in_width, in_channels]
                 h_conv = self.conv2d(self.placeholder_images[i], W_conv1) + b_conv1
 
             # TODO Layer S 1 is a pooling layer with 10 feature maps using max operation

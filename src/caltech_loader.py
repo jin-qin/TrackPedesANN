@@ -162,8 +162,8 @@ class CaltechLoader:
                 # after all frames of this video have been preprocessed, we can start creating pairs
                 print("Number of created training pairs:", len(self.trainingSamples))
 
-                # TODO remove temp code: currently only max 5000 pairs for speed up during development
-                if len(self.trainingSamples) > 5000:
+                # TODO remove temp code: currently only max 300 pairs for speed up during development
+                if len(self.trainingSamples) > 300:
                     print("FORCE STOP");
                     break
 

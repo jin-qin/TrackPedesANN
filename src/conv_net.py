@@ -120,8 +120,7 @@ class ConvolutionalNetwork:
         self.conv_filter_height = 5
         single_image_channels = self.size_input[-1]  # 5
 
-        W_conv, b_conv, h_pool = [], [], []
-        S1 = np.array()
+        W_conv, b_conv, h_pool, S1 = [], [], [], []
         for i in range(self.conv1_independent_parts):
             with tf.name_scope("C1_part{}".format(i + 1)):
 
@@ -149,8 +148,9 @@ class ConvolutionalNetwork:
             # => 2x2 pooling (as only 4 values are used)
             # TODO ensure that those params are equivalent to the given formula in the paper (they should fit)
             with tf.name_scope("S1_part{}".format(i + 1)):
-                S1[i] = self.max_pool_2x2(h_conv)
+                S1.append(self.max_pool_2x2(h_conv))
 
+        S1 = np.asarray(S1)
 
         ##### GLOBAL BRANCH Begin #####
         c2size = 33
@@ -158,9 +158,71 @@ class ConvolutionalNetwork:
             with tf.name_scope("C2_part{}".format(i + 1)):
 
                 if i == 0:
-                    c2_input = tf.concat(0, [S1[0], S1[1], S1[2]])
+                    c2_input = self.mergeChannels([S1[0], S1[1], S1[2]])
                 elif i == 1:
-                    c2_input = tf.concat(0, [S1[1], S1[2], S1[3]])
+                    c2_input = self.mergeChannels([S1[1], S1[2], S1[3]])
+                elif i == 2:
+                    c2_input = self.mergeChannels([S1[2], S1[3], S1[4]])
+                elif i == 3:
+                    c2_input = self.mergeChannels([S1[0], S1[3], S1[4]])
+                elif i == 4:
+                    c2_input = self.mergeChannels([S1[0], S1[1], S1[4]])
+                elif i == 5:
+                    c2_input = self.mergeChannels([S1[0], S1[1], S1[2], S1[3]])
+                elif i == 6:
+                    c2_input = self.mergeChannels([S1[1], S1[2], S1[3], S1[4]])
+                elif i == 7:
+                    c2_input = self.mergeChannels([S1[0], S1[2], S1[3], S1[4]])
+                elif i == 8:
+                    c2_input = self.mergeChannels([S1[0], S1[1], S1[3], S1[4]])
+                elif i == 9:
+                    c2_input = self.mergeChannels([S1[0], S1[1], S1[2], S1[4]])
+                elif i == 10:
+                    c2_input = self.mergeChannels([S1[0], S1[1], S1[2], S1[3], S1[4]])
+                elif i == 11:
+                    c2_input = self.mergeChannels([S1[5], S1[6], S1[7]])
+                elif i == 12:
+                    c2_input = self.mergeChannels([S1[6], S1[7], S1[8]])
+                elif i == 13:
+                    c2_input = self.mergeChannels([S1[7], S1[8], S1[9]])
+                elif i == 14:
+                    c2_input = self.mergeChannels([S1[5], S1[8], S1[9]])
+                elif i == 15:
+                    c2_input = self.mergeChannels([S1[5], S1[6], S1[9]])
+                elif i == 16:
+                    c2_input = self.mergeChannels([S1[5], S1[6], S1[7], S1[8]])
+                elif i == 17:
+                    c2_input = self.mergeChannels([S1[6], S1[7], S1[8], S1[9]])
+                elif i == 18:
+                    c2_input = self.mergeChannels([S1[5], S1[7], S1[8], S1[9]])
+                elif i == 19:
+                    c2_input = self.mergeChannels([S1[5], S1[6], S1[8], S1[9]])
+                elif i == 20:
+                    c2_input = self.mergeChannels([S1[5], S1[6], S1[7], S1[9]])
+                elif i == 21:
+                    c2_input = self.mergeChannels([S1[5], S1[6], S1[7], S1[8], S1[9]])
+                elif i == 22:
+                    c2_input = self.mergeChannels([S1[0], S1[2], S1[3], S1[5], S1[7], S1[8]])
+                elif i == 23:
+                    c2_input = self.mergeChannels([S1[1], S1[3], S1[4], S1[6], S1[8], S1[9]])
+                elif i == 24:
+                    c2_input = self.mergeChannels([S1[0], S1[2], S1[4], S1[5], S1[7], S1[9]])
+                elif i == 25:
+                    c2_input = self.mergeChannels([S1[0], S1[1], S1[3], S1[5], S1[6], S1[7]])
+                elif i == 26:
+                    c2_input = self.mergeChannels([S1[1], S1[2], S1[4], S1[6], S1[7], S1[9]])
+                elif i == 27:
+                    c2_input = self.mergeChannels([S1[0], S1[1], S1[2], S1[5], S1[8], S1[9]])
+                elif i == 28:
+                    c2_input = self.mergeChannels([S1[1], S1[2], S1[3], S1[5], S1[6], S1[9]])
+                elif i == 29:
+                    c2_input = self.mergeChannels([S1[2], S1[3], S1[4], S1[5], S1[6], S1[7]])
+                elif i == 30:
+                    c2_input = self.mergeChannels([S1[0], S1[3], S1[4], S1[6], S1[7], S1[8]])
+                elif i == 31:
+                    c2_input = self.mergeChannels([S1[0], S1[1], S1[4], S1[7], S1[8], S1[9]])
+                elif i == 32:
+                    c2_input = self.mergeChannels([S1[0], S1[1], S1[2], S1[3], S1[4], S1[5], S1[6], S1[7], S1[8], S1[9]])
 
                 self.conv2_filter_height = 7
                 self.conv2_filter_width = 3
@@ -435,5 +497,8 @@ class ConvolutionalNetwork:
 
     def getTrainingRuntimeSeconds(self):
         return self.runtime_training_end
+
+    def mergeChannels(self,inputs):
+        return tf.concat(3, inputs)
 
 

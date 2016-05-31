@@ -204,7 +204,11 @@ class CaltechLoader:
 
         # convert to np
         self.trainingSamplesPrevious = np.asarray(self.trainingSamplesPrevious, np.float16)
+        self.trainingSamplesPrevious = np.swapaxes(self.trainingSamplesPrevious, 1, 3)
+        self.trainingSamplesPrevious = np.swapaxes(self.trainingSamplesPrevious, 1, 2)
         self.trainingSamplesCurrent = np.asarray(self.trainingSamplesCurrent, np.float16)
+        self.trainingSamplesCurrent = np.swapaxes(self.trainingSamplesCurrent, 1, 3)
+        self.trainingSamplesCurrent = np.swapaxes(self.trainingSamplesCurrent, 1, 2)
 
         if training:
             name = "caltech-training.p"

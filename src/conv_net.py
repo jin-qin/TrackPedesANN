@@ -121,6 +121,7 @@ class ConvolutionalNetwork:
         single_image_channels = self.size_input[-1]  # 5
 
         W_conv, b_conv, h_pool = [], [], []
+        S1 = np.array()
         for i in range(self.conv1_independent_parts):
             with tf.name_scope("C1_part{}".format(i + 1)):
 
@@ -148,8 +149,33 @@ class ConvolutionalNetwork:
             # => 2x2 pooling (as only 4 values are used)
             # TODO ensure that those params are equivalent to the given formula in the paper (they should fit)
             with tf.name_scope("S1_part{}".format(i + 1)):
-                h_pool.append(self.max_pool_2x2(h_conv))
+                S1[i] = self.max_pool_2x2(h_conv)
 
+
+        ##### GLOBAL BRANCH Begin #####
+        c2size = 33
+        for i in range(c2size):
+            with tf.name_scope("C2_part{}".format(i + 1)):
+
+                if i == 0:
+                    c2_input = tf.concat(0, [S1[0], S1[1], S1[2]])
+                elif i == 1:
+                    c2_input = tf.concat(0, [S1[1], S1[2], S1[3]])
+
+                self.conv2_filter_height = 7
+                self.conv2_filter_width = 3
+                self.number_of_filters_conv2 = 1
+                W_conv2, b_conv2 = self.vars_W_b(
+                    [self.conv2_filter_height, self.conv2_filter_width, single_image_channels,
+                     self.number_of_filters_conv2])
+
+                # build actual (part of) convolutional layer
+                # TODO no activation function ?? e.g.: h_conv = tf.nn.relu(h_conv)
+                c2_current_part = self.conv2d(c2_input, W_conv2) + b_conv2
+
+        
+
+        ##### GLOBAL BRANCH End #######
 
 
         ## NEW TRACKING END ######################################################

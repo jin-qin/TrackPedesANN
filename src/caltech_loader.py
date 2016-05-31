@@ -7,6 +7,7 @@ import cv2 as cv
 from collections import defaultdict
 import numpy as np
 import cPickle as pickle
+import scipy.stats as st
 
 class CaltechLoader:
 
@@ -298,22 +299,65 @@ class CaltechLoader:
         # TODO call only once
         self.loadDataSet(True)
 
-        # TODO get training data
+        # get training data
         XPrevious, XCurrent = self.trainingSamplesPrevious, self.trainingSamplesCurrent
-        Yall = XPrevious # TODO calculate correct Yall
+        Yall = self.calcTargetProbMap(XCurrent)
+
         return XPrevious, XCurrent, Yall
+
+    def calcTargetProbMap(self, currentFrames):
+
+        # calculate target probability maps
+        # TODO check generation. right now, all maps are identical as the position of the head has been normalized
+        # to a specific position
+        # => or should the position still be unnormalized? and only the ratios are normalized? But how can the ped
+        # always be at the same position in the previous image??
+        sigma = 0.1
+        gxyBig = self.gkern(64, sigma)
+        leftrightborderremove = (64 - 24) / 2
+        gxyFit = gxyBig[:,
+                 leftrightborderremove:64 - leftrightborderremove]  # center/center will be used as the normalized position
+
+        # use softmax to allow probability interpretations
+        gxyFit = self.softmax(gxyFit)
+
+        # copy same value as target probability map for all training samples
+        # TODO if it will really be the same for all, use single representation instead
+        Yall = np.full((currentFrames.shape[0], 64, 24), gxyFit)
+
+        return Yall
 
     def getTestData(self):
 
         # TODO call only once
         self.loadDataSet(False)
 
-        # TODO get training data
+        # TODO get test data
         XPrevious, XCurrent = self.testSamplesPrevious, self.testSamplesCurrent
-        Yall = XPrevious # TODO calculate correct Yall
+        Yall = self.calcTargetProbMap(XCurrent)
         return XPrevious, XCurrent , Yall
 
+    # source: http://stackoverflow.com/questions/29731726/how-to-calculate-a-gaussian-kernel-matrix-efficiently-in-numpy
+    def gkern(self, kernlen=21, nsig=3):
+        """Returns a 2D Gaussian kernel array."""
 
-# TODO remove debug code
-cfc_datasetpath = "/media/th/6C4C-2ECD/ml_datasets"
-calLoader = CaltechLoader(cfc_datasetpath)
+        interval = (2 * nsig + 1.) / (kernlen)
+        x = np.linspace(-nsig - interval / 2., nsig + interval / 2., kernlen + 1)
+        kern1d = np.diff(st.norm.cdf(x))
+        kernel_raw = np.sqrt(np.outer(kern1d, kern1d))
+        kernel = kernel_raw / kernel_raw.sum()
+        return kernel
+
+
+    def softmax(self, allScores):
+
+        # prevent overflow by subtracting a high constant from each term (doesn't change the final result, but the numbers during computation are smaller)
+        allScoresSmooth = allScores - allScores.max(axis=1,
+                                                    keepdims=True)  # use max per row (not total max) to ensure maximum numerical stability
+
+        # compute all needed values only once
+        e = np.exp(allScoresSmooth)
+
+        # keep in mind that allScores[i] contains 10 scores for one image
+        # so we need to divide each element by the sum of its row-sum, not by the whole sum
+        return e / e.sum(axis=1, keepdims=True)

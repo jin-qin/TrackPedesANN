@@ -105,8 +105,10 @@ class ConvolutionalNetwork:
         # reminder: "image is flipped": the image format is the one of opencv
         #       => <number_of_rows> x <number_of_cols> = 128 x 48
         #       => this is exactly what we need as the required input tensors need to be: [batch, in_height, in_width, in_channels]
-        self.x_previous = tf.placeholder(tf.float32, shape=self.size_input, name="x_images")
-        self.x_current = tf.placeholder(tf.float32, shape=self.size_input, name="x_images")
+        self.x_previous = tf.placeholder(tf.float32, shape=self.size_input, name="x_previous")
+        self.x_current = tf.placeholder(tf.float32, shape=self.size_input, name="x_current")
+        self.placeholder_labels = tf.placeholder(tf.float32, shape=(self.size_input[0],64,24), name="y_pos_probs")
+
 
 
         # Layer C1: convolutional layer with 10 feature maps
@@ -317,15 +319,25 @@ class ConvolutionalNetwork:
         ##### LOCAL BRANCH End ########
 
         # Output
-        finalW1, finalB1 = self.vars_W_b([24, 64]) #finalB1 will not be used
-        finalW2, finalB2 = self.vars_W_b([24, 64])
+
+        # remove last dimension of shape 1 from tensors
+        C3 = tf.squeeze(C3)
+        C4 = tf.squeeze(C4)
+
+        finalW1, finalB1 = self.vars_W_b([64, 24]) #finalB1 will not be used
+        finalW2, finalB2 = self.vars_W_b([64, 24])
         self.scores =  tf.sigmoid(tf.mul(C3, finalW1) + tf.mul(C4, finalW2) + finalB2)
 
         # loss function
         with tf.name_scope("loss"):
 
-            cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(self.scores,
-                                                                           self.placeholder_labels,
+            # tensorflow can only evaluate 2D results. So we just handle each pixel of the probability map as a single
+            # class => flattening needed
+            scoresFlattened = tf.reshape(self.scores, [self.batch_size, -1])
+            targetProbsFlattened = tf.reshape(self.placeholder_labels, [self.batch_size, -1])
+
+            cross_entropy = tf.nn.softmax_cross_entropy_with_logits(scoresFlattened,
+                                                                    targetProbsFlattened,
                                                                            name="xentropy")
             loss = tf.reduce_mean(cross_entropy, name="xentropy_mean")
 
@@ -372,7 +384,8 @@ class ConvolutionalNetwork:
         self.session.run(init)
 
         # this method will be used to calculate the current accuracy (create only once)
-        self.check_results = tf.nn.in_top_k(self.scores, self.placeholder_labels, 1)
+        # TODO reimplement for non-integer values
+        #self.check_results = tf.nn.in_top_k(self.scores, self.placeholder_labels, 1)
 
         # allow saving results to file
         summary_writer = tf.train.SummaryWriter(os.path.join(self.log_dir, "tf-summary"), self.session.graph)
@@ -390,8 +403,7 @@ class ConvolutionalNetwork:
             # finally start training with current batch
             feed_dict ={self.x_previous:batch_data_previous,
                         self.x_current: batch_data_current,
-                        self.placeholder_labels:batch_labels,
-                        self.dropout_prob: self.dropout_rate}
+                        self.placeholder_labels:batch_labels} #TODO add dropout again ,self.dropout_prob: self.dropout_rate
             _, loss_value = self.session.run([train_op, loss],
                                      feed_dict)
 
@@ -415,15 +427,16 @@ class ConvolutionalNetwork:
                 if (step + 1) != self.iterations:
                     log.log("Updated accuracies after {}/{} iterations:".format((step + 1), self.iterations))
 
-                    # 1/3: validation data
-                    acc_val = self.accuracy(self.Xval, self.Yval)
-                    log.log(" - validation: {0:.3f}%".format(acc_val * 100))
+                    # 1/3: validation data TODO reuse
+                    #acc_val = self.accuracy(self.Xval, self.Yval)
+                    #log.log(" - validation: {0:.3f}%".format(acc_val * 100))
 
             if (step + 1) % interrupt_every_x_steps_late == 0 and (step + 1) != self.iterations: #don't print in last run as this will be done anyway
 
-                # 2/3: training data
-                acc_train = self.accuracy(self.Xtrain, self.Ytrain)
-                log.log(" - training: {0:.3f}%".format(acc_train * 100))
+                # 2/3: training data TODO reuse
+                True
+                #acc_train = self.accuracy(self.Xtrain, self.Ytrain)
+                #log.log(" - training: {0:.3f}%".format(acc_train * 100))
 
                 # 3/3: test data
                 # acc_test = self.accuracy(self.Xtest, self.Ytest)

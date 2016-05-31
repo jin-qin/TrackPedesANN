@@ -18,7 +18,7 @@ cf_log_dir = cf_log_dir_init = "logs"
 cf_batch_size = 100 #must divide number of images in all used datasets
 cf_learning_rate = 0.015
 cf_size_fully_connected_layer = 1024
-cf_num_iters = 30000 #30.000 46 45 45
+cf_num_iters = 1000 #30.000 46 45 45
 cf_regularization_strength = 0.1 #0 means no regularization L2
 cf_learning_rate_decay = 0.99 #1 means no decay
 #cf_verbose = True

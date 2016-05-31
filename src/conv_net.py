@@ -6,7 +6,7 @@ import time
 import os
 
 class ConvolutionalNetwork:
-    def __init__(self, Xtrain, Ytrain, Xval, Yval, min_max_scaling=True, standardization=True,
+    def __init__(self, XtrainPrevious, XtrainCurrent, Ytrain, XvalPrevious, XvalCurrent, Yval, min_max_scaling=True, standardization=True,
                  batch_size=200,
                  learning_rate=0.01,
                  size_full=300,
@@ -26,9 +26,11 @@ class ConvolutionalNetwork:
         log.log('Creating network..')
 
         # save given params
-        self.Xtrain = Xtrain
+        self.XtrainPrevious = XtrainPrevious
+        self.XtrainCurrent = XtrainCurrent
         self.Ytrain = Ytrain
-        self.Xval = Xval
+        self.XvalPrevious = XvalPrevious
+        self.XvalCurrent = XvalCurrent
         self.Yval = Yval
         self.batch_size = batch_size
         self.starter_learning_rate = learning_rate
@@ -51,7 +53,7 @@ class ConvolutionalNetwork:
 
         # use original image shape, but resize the number of images to a single batch
         self.size_input = []
-        orig_img_shape = tf.TensorShape(self.Xtrain.shape).as_list()
+        orig_img_shape = tf.TensorShape(self.XtrainPrevious.shape).as_list()
         for i in range(len(orig_img_shape)):
             if i > 0:
                 self.size_input.append(orig_img_shape[i])
@@ -63,11 +65,11 @@ class ConvolutionalNetwork:
         # log.log( '.. Standard deviation W-init: {}.'.format(cf_standard_deviation_w_init) )
 
         # preprocessing (will change original data, too!)
-        log.log(".. preprocessing data")
-        self.preprocessInit(min_max_scaling, standardization, Xtrain)  # call this independently of the values of min_max_scaling or standardization!
+        log.log(".. preprocessing data") #TODO add self.XtrainCurrent and XvalCurrent
+        self.preprocessInit(min_max_scaling, standardization, self.XtrainPrevious)  # call this independently of the values of min_max_scaling or standardization!
         if min_max_scaling or standardization:
-            self.preprocessData(Xtrain)
-            self.preprocessData(Xval)
+            self.preprocessData(self.XtrainPrevious)
+            self.preprocessData(self.XvalPrevious)
             #self.preprocessData(Xtest)
         log.log(".. finished preprocessing data")
 
@@ -278,14 +280,36 @@ class ConvolutionalNetwork:
             # TODO no activation function ?? e.g.: h_conv = tf.nn.relu(h_conv)
             C3 = self.conv2d(c3_input, W_conv3) + b_conv3
 
-        # TODO the paper mentiones a translation transfrom at this point. Check out what this means and if we need
-        # to do anything
+        # (4 times??) upsamling to 24 x 64
+        C3 = tf.image.resize_images(C3, 64, 24)
 
         ##### GLOBAL BRANCH End #######
 
         ##### LOCAL BRANCH Begin ######
 
+        c4size = 10
+        with tf.name_scope("C4"):
 
+            # merge all existing inputs to simulate further 3D convolutional ops
+            c4_input = self.mergeChannels([
+                S1[0], S1[1], S1[2], S1[3], S1[4], S1[5], S1[6], S1[7], S1[8], S1[9]
+            ])
+
+            self.conv4_filter_height = 7
+            self.conv4_filter_width = 7
+            self.number_of_filters_conv4 = 1
+            c4number_channels = c4_input.get_shape()[-1].value
+            W_conv4, b_conv4 = self.vars_W_b(
+                [self.conv4_filter_width, self.conv4_filter_height, c4number_channels,
+                 self.number_of_filters_conv4])
+
+            # build actual (part of) convolutional layer
+            # TODO no activation function ?? e.g.: h_conv = tf.nn.relu(h_conv)
+            C4 = self.conv2d(c4_input, W_conv4) + b_conv4
+
+
+        # TODO the paper mentiones a translation transfrom at this point. Check out what this means and if we need
+        # to do anything
 
         ##### LOCAL BRANCH End ########
 
@@ -408,11 +432,13 @@ class ConvolutionalNetwork:
 
             # get a batch of training samples
             offset = (step * self.batch_size) % (self.Ytrain.shape[0] - self.batch_size)
-            batch_data = self.Xtrain[offset:(offset + self.batch_size), :]
+            batch_data_previous = self.XtrainPrevious[offset:(offset + self.batch_size), :]
+            batch_data_current = self.XtrainCurrent[offset:(offset + self.batch_size), :]
             batch_labels = self.Ytrain[offset:(offset + self.batch_size)]
 
             # finally start training with current batch
-            feed_dict ={self.placeholder_images:batch_data,
+            feed_dict ={self.x_previous:batch_data_previous,
+                        self.x_current: batch_data_current,
                         self.placeholder_labels:batch_labels,
                         self.dropout_prob: self.dropout_rate}
             _, loss_value = self.session.run([train_op, loss],

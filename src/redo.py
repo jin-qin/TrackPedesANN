@@ -163,28 +163,28 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
     log.log('Loading ' + cfc_dataset_name + ' dataset..')
     if(cf_dataset == 0):
         calLoader = cl.CaltechLoader(cfc_datasetpath)
-        Xall, Yall = calLoader.getTrainingData()
+        XTrainPrevious, XTrainCurrent, Yall = calLoader.getTrainingData()
 
         # resample training data to gain validation dataset
         # TODO set correct ratio and maybe move to CaltechLoader
         log.log(".. resampling training and validation data")
-        indices = np.random.permutation(Xall.shape[0])
+        indices = np.random.permutation(XTrainPrevious.shape[0])
         train_ids, val_ids = indices[:4000], indices[4000:] #TODO fix params when changing dataset size
-        Xtrain, Xval = Xall[train_ids, :], Xall[val_ids, :]
+        XTrainPrevious, XTrainCurrent, XvalPrevious, XvalCurrent = XTrainPrevious[train_ids, :], XTrainCurrent[train_ids, :], XTrainPrevious[val_ids, :], XTrainCurrent[val_ids, :]
         Ytrain = Yall[train_ids]
         Yval = Yall[val_ids]
 
-        del Xall
+        #del Xall
         del Yall
         gc.collect()
 
 
-    log.log('.. Trainingset includes {} images.'.format(Xtrain.shape[0]))
+    log.log('.. Trainingset includes {} images.'.format(XTrainPrevious.shape[0]))
 
-    log.log('.. Validationset includes {} images.'.format(Xval.shape[0]))
+    log.log('.. Validationset includes {} images.'.format(XvalPrevious.shape[0]))
 
     # Creating network
-    net = cnn.ConvolutionalNetwork(Xtrain, Ytrain, Xval, Yval,
+    net = cnn.ConvolutionalNetwork(XTrainPrevious, XTrainCurrent, Ytrain, XvalPrevious, XvalCurrent, Yval,
                                    cf_min_max_scaling,
                                    cf_standardization,
                                    cf_batch_size,

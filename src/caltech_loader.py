@@ -36,9 +36,9 @@ class CaltechLoader:
             print("Cached caltech dataset has been found. Start loading..")
 
             if training:
-                self.trainingSamples = pickle.load(open(cache_file, "rb"))
+                self.trainingSamplesPrevious, self.trainingSamplesCurrent = pickle.load(open(cache_file, "rb"))
             else:
-                self.testSamples = pickle.load(open(cache_file, "rb"))
+                self.testSamplesPrevious, self.testSamplesCurrent = pickle.load(open(cache_file, "rb"))
 
             print("Finished cached data import.")
 
@@ -128,7 +128,7 @@ class CaltechLoader:
         if skipped > 0:
             print(skipped, " further files skipped. Forgot to extract?")
 
-        self.trainingSamples = []
+        self.trainingSamplesPrevious, self.trainingSamplesCurrent = [], []
 
         for dname in image_folders_only:
             set_name = os.path.basename(dname)
@@ -160,10 +160,10 @@ class CaltechLoader:
 
 
                 # after all frames of this video have been preprocessed, we can start creating pairs
-                print("Number of created training pairs:", len(self.trainingSamples))
+                print("Number of created training pairs:", len(self.trainingSamplesPrevious))
 
                 # TODO remove temp code: currently only max 300 pairs for speed up during development
-                if len(self.trainingSamples) > 300:
+                if len(self.trainingSamplesPrevious) > 300:
                     print("FORCE STOP");
                     break
 
@@ -181,7 +181,8 @@ class CaltechLoader:
                             # if current pedestrian does exist in previous frame, too
                             # => save pair of frames as input data
                             if prevFrame != None and len(prevFrame) > 1: #last condition to skip empty dictionarys
-                                self.trainingSamples.append([prevFrame, ped_frame])
+                                self.trainingSamplesPrevious.append(prevFrame)
+                                self.trainingSamplesCurrent.append(ped_frame)
 
                 del self.framePatches
                 gc.collect()
@@ -195,13 +196,15 @@ class CaltechLoader:
 
 
         # add gradient channels
-        for i in range(len(self.trainingSamples)): #indexes 0-4: previous image. 5-9:current image
-            self.trainingSamples[i] = np.append(self.wrapImage(self.trainingSamples[i][0]), self.wrapImage(self.trainingSamples[i][1]), axis=0)
+        for i in range(len(self.trainingSamplesCurrent)): #indexes 0-4: previous image. 5-9:current image
+            self.trainingSamplesPrevious[i] = self.wrapImage(self.trainingSamplesPrevious[i])
+            self.trainingSamplesCurrent[i] = self.wrapImage(self.trainingSamplesCurrent[i])
 
         print("Finished gradient calculations.")
 
         # convert to np
-        self.trainingSamples = np.asarray(self.trainingSamples, np.float16)
+        self.trainingSamplesPrevious = np.asarray(self.trainingSamplesPrevious, np.float16)
+        self.trainingSamplesCurrent = np.asarray(self.trainingSamplesCurrent, np.float16)
 
         if training:
             name = "caltech-training.p"
@@ -211,12 +214,14 @@ class CaltechLoader:
         # saving data to file
         if False: #TODO activate again
             print("saving data to file")
-            pickle.dump(self.trainingSamples, open(os.path.join(self.output_dir, name), "wb"))
+            pickle.dump([self.trainingSamplesPrevious,self.trainingSamplesCurrent], open(os.path.join(self.output_dir, name), "wb"))
 
         # TODO find better solution for test data fix
         if not training:
-            self.testSamples = self.trainingSamples
-            self.trainingSamples = None
+            self.testSamplesPrevious = self.trainingSamplesPrevious
+            self.testSamplesCurrent = self.trainingSamplesCurrent
+            self.trainingSamplesPrevious = None
+            self.trainingSamplesCurrent = None
 
         print("finished")
 
@@ -290,9 +295,9 @@ class CaltechLoader:
         self.loadDataSet(True)
 
         # TODO get training data
-        Xall = self.trainingSamples
-        Yall = Xall # TODO calculate correct Yall
-        return Xall, Yall
+        XPrevious, XCurrent = self.trainingSamplesPrevious, self.trainingSamplesCurrent
+        Yall = XPrevious # TODO calculate correct Yall
+        return XPrevious, XCurrent, Yall
 
     def getTestData(self):
 
@@ -300,9 +305,9 @@ class CaltechLoader:
         self.loadDataSet(False)
 
         # TODO get training data
-        Xall = self.testSamples
-        Yall = None # TODO calculate correct Yall
-        return Xall, Yall
+        XPrevious, XCurrent = self.testSamplesPrevious, self.testSamplesCurrent
+        Yall = XPrevious # TODO calculate correct Yall
+        return XPrevious, XCurrent , Yall
 
 
 # TODO remove debug code

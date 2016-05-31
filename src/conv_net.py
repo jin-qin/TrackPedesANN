@@ -154,7 +154,7 @@ class ConvolutionalNetwork:
 
         ##### GLOBAL BRANCH Begin #####
         c2size = 33
-        C2, S2 = []
+        C2, S2 = [], []
         for i in range(c2size):
             with tf.name_scope("C2_part{}".format(i + 1)):
 

@@ -125,7 +125,7 @@ class ConvolutionalNetwork:
             with tf.name_scope("C1_part{}".format(i + 1)):
 
                 W_conv1, b_conv1 = self.vars_W_b(
-                    [self.conv_filter_height, self.conv_filter_width, single_image_channels,
+                    [self.conv_filter_width, self.conv_filter_height, single_image_channels,
                      self.number_of_filters_conv1])
                 W_conv.append(W_conv1)
                 b_conv.append(b_conv1)
@@ -154,6 +154,7 @@ class ConvolutionalNetwork:
 
         ##### GLOBAL BRANCH Begin #####
         c2size = 33
+        C2, S2 = []
         for i in range(c2size):
             with tf.name_scope("C2_part{}".format(i + 1)):
 
@@ -227,17 +228,66 @@ class ConvolutionalNetwork:
                 self.conv2_filter_height = 7
                 self.conv2_filter_width = 3
                 self.number_of_filters_conv2 = 1
+                c2number_channels = c2_input.get_shape()[-1].value
                 W_conv2, b_conv2 = self.vars_W_b(
-                    [self.conv2_filter_height, self.conv2_filter_width, single_image_channels,
+                    [self.conv2_filter_width, self.conv2_filter_height, c2number_channels,
                      self.number_of_filters_conv2])
 
                 # build actual (part of) convolutional layer
                 # TODO no activation function ?? e.g.: h_conv = tf.nn.relu(h_conv)
-                c2_current_part = self.conv2d(c2_input, W_conv2) + b_conv2
+                h_conv = self.conv2d(c2_input, W_conv2) + b_conv2
+                C2.append(h_conv)
 
-        
+                # Layer S2 is a pooling layer with 33 feature maps using max operation
+                # each of this feature maps is only connected to exactly one particular
+                # feature map of C2. So we can just connect each part of C2 right after
+                # creating to the corresponding part of S2
+                # => 2x2 pooling (as only 4 values are used)
+                # TODO ensure that those params are equivalent to the given formula in the paper (they should fit)
+                with tf.name_scope("S2_part{}".format(i + 1)):
+                    S2.append(self.max_pool_2x2(h_conv))
+
+        C2 = np.asarray(C2)
+        S2 = np.asarray(S2)
+
+
+
+        ##
+
+        c3size = 80
+        with tf.name_scope("C3"):
+
+            # merge all existing inputs to simulate further 3D convolutional ops
+            # TODO in the paper they propose using "10 random choices" instead of all 33. How to implement?
+            c3_input = self.mergeChannels([
+                S2[0], S2[1], S2[2], S2[3], S2[4], S2[5], S2[6], S2[7], S2[8], S2[9],
+                S2[10], S2[11], S2[12], S2[13], S2[14], S2[15], S2[16], S2[17], S2[18], S2[19],
+                S2[20], S2[21], S2[22], S2[23], S2[24], S2[25], S2[26], S2[27], S2[28], S2[29],
+                S2[30], S2[31], S2[32]
+            ])
+
+            self.conv3_filter_height = 7
+            self.conv3_filter_width = 3
+            self.number_of_filters_conv3 = 1
+            c3number_channels = c3_input.get_shape()[-1].value
+            W_conv3, b_conv3 = self.vars_W_b(
+                [self.conv3_filter_width, self.conv3_filter_height, c3number_channels,
+                 self.number_of_filters_conv3])
+
+            # build actual (part of) convolutional layer
+            # TODO no activation function ?? e.g.: h_conv = tf.nn.relu(h_conv)
+            C3 = self.conv2d(c3_input, W_conv3) + b_conv3
+
+        # TODO the paper mentiones a translation transfrom at this point. Check out what this means and if we need
+        # to do anything
 
         ##### GLOBAL BRANCH End #######
+
+        ##### LOCAL BRANCH Begin ######
+
+
+
+        ##### LOCAL BRANCH End ########
 
 
         ## NEW TRACKING END ######################################################
@@ -261,7 +311,7 @@ class ConvolutionalNetwork:
                 else:
                     W_conv3, b_conv3 = self.vars_W_b(
                         [self.conv_filter_size, self.conv_filter_size, W_conv[i-1].get_shape().as_list()[3],
-                         self.number_of_filters_conv2])
+                         self.number_of_filters_conv3])
                     W_conv.append(W_conv3)
                     b_conv.append(b_conv3)
                     h_conv = tf.nn.relu(self.conv2d(h_pool[i-1], W_conv[i]) + b_conv[i])

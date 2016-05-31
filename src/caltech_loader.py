@@ -141,22 +141,21 @@ class CaltechLoader:
 
                 print("Processing video ", set_name, video_name)
 
-                self.framePatches = defaultdict(dict)
-
                 cap = cv.VideoCapture(fn)
+                previousFrame = None
                 i = 0
                 while True:
                     ret, frame = cap.read()
                     if not ret:
                         break
 
-                    self.framePatches[i] = defaultdict(dict)
-
-                    self.extractPedestriansFromImage(frame, set_name, video_name, i)
+                    if previousFrame != None:
+                        self.extractPedestriansFromImage(previousFrame, frame, set_name, video_name, i)
 
                     # TODO save original raw image on disk?
                     #self.save_img(dname, fn, i, frame)
 
+                    previousFrame = frame
                     i += 1
 
 
@@ -167,26 +166,6 @@ class CaltechLoader:
                 if len(self.trainingSamplesPrevious) > 300:
                     print("FORCE STOP");
                     break
-
-                print("Creating input sample pairs for ", set_name, video_name)
-                for frame_i, peds in self.framePatches.iteritems():
-
-                    if (frame_i > 0):
-                        for ped_id, ped_frame in peds.iteritems():
-
-                            try:
-                                prevFrame = self.framePatches[frame_i-1][ped_id]
-                            except (NameError, KeyError) as e:
-                                prevFrame = None
-
-                            # if current pedestrian does exist in previous frame, too
-                            # => save pair of frames as input data
-                            if prevFrame != None and len(prevFrame) > 1: #last condition to skip empty dictionarys
-                                self.trainingSamplesPrevious.append(prevFrame)
-                                self.trainingSamplesCurrent.append(ped_frame)
-
-                del self.framePatches
-                gc.collect()
 
 
                 print(fn)
@@ -258,13 +237,15 @@ class CaltechLoader:
             os.path.basename(fn).split('.')[0], i), frame)
 
 
-    def extractPedestriansFromImage(self, img, set_name, video_name, frame_i):
+    def extractPedestriansFromImage(self, img_prev, img_curr, set_name, video_name, frame_i):
 
         # TODO when saving and loading json file before, we might need frame_i = str(frame_i)
 
         if frame_i in self.annotations[set_name][video_name]['frames']:
             data = self.annotations[set_name][
                 video_name]['frames'][frame_i]
+            data_prev = self.annotations[set_name][
+                video_name]['frames'][frame_i -1]
 
             for datum in data:
                 ped_id = datum['id']
@@ -272,26 +253,38 @@ class CaltechLoader:
 
                 # skip too small images
                 if not(w < self.image_size_min_resize or h < self.image_size_min_resize):
-                    img_ped = img[y:y + h, x:x + w]
-                    w_real = len(img_ped[0])
-                    h_real = len(img_ped)
-                    if not(w_real < self.image_size_min_resize or h_real < self.image_size_min_resize):
 
-                        # resize all images
-                        # TODO check how to resize probably for different-ratio image patches
-                        resized_image = cv.resize(img_ped, (self.image_width, self.image_height))
+                    # go on, only if the pedestrian exists in the previous frame, too
+                    ped_exists_in_prev_frame = False
+                    for datum_previous in data_prev:
+                        if datum_previous['id'] == ped_id:
+                            ped_exists_in_prev_frame = True
+                            break;
 
-                        if type(resized_image) != np.ndarray:
-                            print("Hugh?")
+                    if ped_exists_in_prev_frame:
 
-                        # save it for further usage
-                        self.framePatches[frame_i][ped_id] = resized_image
+                        img_ped = img_curr[y:y + h, x:x + w]
+                        img_ped_prev = img_prev[y:y + h, x:x + w]
+                        w_real = len(img_ped[0])
+                        h_real = len(img_ped)
+                        if not(w_real < self.image_size_min_resize or h_real < self.image_size_min_resize):
 
-                        #self.save_img(set_name, video_name, frame_i, img_ped)
+                            # resize all images
+                            # TODO check how to resize probably for different-ratio image patches
+                            resized_image = cv.resize(img_ped, (self.image_width, self.image_height))
+                            resized_image_prev = cv.resize(img_ped_prev, (self.image_width, self.image_height))
 
-                        #cv.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 1)
-                        #n_objects += 1
-                    #wri.write(img)
+                            if type(resized_image) != np.ndarray:
+                                print("Hugh?")
+
+                            self.trainingSamplesPrevious.append(resized_image_prev)
+                            self.trainingSamplesCurrent.append(resized_image)
+
+                            #self.save_img(set_name, video_name, frame_i, img_ped)
+
+                            #cv.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 1)
+                            #n_objects += 1
+                        #wri.write(img)
 
 
     def getTrainingData(self):

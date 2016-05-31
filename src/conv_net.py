@@ -309,80 +309,31 @@ class ConvolutionalNetwork:
 
 
         # TODO the paper mentiones a translation transfrom at this point. Check out what this means and if we need
+        W_conv4, b_conv4 = self.vars_W_b(
+            [self.conv4_filter_width, self.conv4_filter_height, c4number_channels,
+             self.number_of_filters_conv4])
         # to do anything
 
         ##### LOCAL BRANCH End ########
 
-
-        ## NEW TRACKING END ######################################################
-
-
-        # generate placeholders for images and labels
-        self.placeholder_images = tf.placeholder(tf.float32, shape=self.size_input, name="images")
-        self.placeholder_labels = tf.placeholder(tf.int64, shape=(None), name="labels")
-
-        W_conv, b_conv, h_pool = [], [], []
-        for i in range(self.number_of_conv_layers):
-            with tf.name_scope("conv{}".format(i+1)):
-
-                if i == 0:
-                    single_image_channels = self.size_input[-1]
-                    W_conv1, b_conv1 = self.vars_W_b(
-                        [self.conv_filter_size, self.conv_filter_size, single_image_channels, self.number_of_filters_conv1])
-                    W_conv.append(W_conv1)
-                    b_conv.append(b_conv1)
-                    h_conv = tf.nn.relu(self.conv2d(self.placeholder_images, W_conv1) + b_conv1)
-                else:
-                    W_conv3, b_conv3 = self.vars_W_b(
-                        [self.conv_filter_size, self.conv_filter_size, W_conv[i-1].get_shape().as_list()[3],
-                         self.number_of_filters_conv3])
-                    W_conv.append(W_conv3)
-                    b_conv.append(b_conv3)
-                    h_conv = tf.nn.relu(self.conv2d(h_pool[i-1], W_conv[i]) + b_conv[i])
-
-
-
-
-            with tf.name_scope("pool{}".format(i+1)):
-                h_pool.append(self.max_pool_2x2(h_conv))
-
-
-
-        h_pool_last_flat = tf.reshape(h_pool[-1], [self.batch_size, -1])
-        dim_out_last_pool = h_pool_last_flat.get_shape()[1].value
-            #h_pool4_flat: batch_size x
-
-        # fully connected layer
-        with tf.name_scope("full_layer"):
-            W_full, b_full = self.vars_W_b([dim_out_last_pool, self.size_full])
-            h_full_layer = tf.nn.relu(tf.matmul(h_pool_last_flat, W_full) + b_full)
-
-        # dropout
-        with tf.name_scope("dropout"):
-            self.dropout_prob = tf.placeholder(tf.float32)
-            h_full_drop = tf.nn.dropout(h_full_layer, self.dropout_prob)
-
-
-        # output layer = softmax
-        with tf.name_scope("softmax_layer"):
-            W_softmax, b_softmax = self.vars_W_b([self.size_full, self.size_output])
-            self.scores = tf.matmul(h_full_drop, W_softmax) + b_softmax
+        # Output
+        finalW1, finalB1 = self.vars_W_b([24, 64]) #finalB1 will not be used
+        finalW2, finalB2 = self.vars_W_b([24, 64])
+        self.scores =  tf.sigmoid(tf.mul(C3, finalW1) + tf.mul(C4, finalW2) + finalB2)
 
         # loss function
         with tf.name_scope("loss"):
-
-            #cross_entropy = tf.reduce_mean(-tf.reduce_sum(y_ * tf.log(y), reduction_indices=[1]))
 
             cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(self.scores,
                                                                            self.placeholder_labels,
                                                                            name="xentropy")
             loss = tf.reduce_mean(cross_entropy, name="xentropy_mean")
 
-        # add L2 regularization
-        if self.regularization_strength != 0:
-            regularizers = tf.nn.l2_loss(W_full) + tf.nn.l2_loss(b_full) + tf.nn.l2_loss(W_softmax) + tf.nn.l2_loss(b_softmax)
-            reg = tf.constant(self.regularization_strength, dtype=tf.float32)
-            loss += reg * regularizers
+        # add L2 regularization #TODO
+        #if self.regularization_strength != 0:
+        #    regularizers = tf.nn.l2_loss(W_full) + tf.nn.l2_loss(b_full) + tf.nn.l2_loss(W_softmax) + tf.nn.l2_loss(b_softmax)
+        #    reg = tf.constant(self.regularization_strength, dtype=tf.float32)
+        #    loss += reg * regularizers
 
         # Create a variable to track the global step (should be equal to the index var "step" in the following for loop)
         global_step = tf.Variable(0, name='global_step', trainable=False)

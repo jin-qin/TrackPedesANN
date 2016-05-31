@@ -408,7 +408,7 @@ class ConvolutionalNetwork:
                                      feed_dict)
 
             # write the summaries and print an overview quite often
-            if step % 100 == 0 or (step + 1) == self.iterations:
+            if True or  step % 100 == 0 or (step + 1) == self.iterations: #TODO remove "True or"
                 # Print status
                 log.log('Iteration {0}/{1}: loss = {2:.2f}, learning rate = {3:.4f}'.format(step + 1, self.iterations, loss_value, self.session.run(self.learning_rate)))
                 # Update the events file.

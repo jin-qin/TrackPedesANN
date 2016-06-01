@@ -37,9 +37,9 @@ class CaltechLoader:
             print("Cached caltech dataset has been found. Start loading..")
 
             if training:
-                self.trainingSamplesPrevious, self.trainingSamplesCurrent = pickle.load(open(cache_file, "rb"))
+                self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.trainingY = pickle.load(open(cache_file, "rb"))
             else:
-                self.testSamplesPrevious, self.testSamplesCurrent = pickle.load(open(cache_file, "rb"))
+                self.testSamplesPrevious, self.testSamplesCurrent, self.testY = pickle.load(open(cache_file, "rb"))
 
             print("Finished cached data import.")
 
@@ -129,7 +129,7 @@ class CaltechLoader:
         if skipped > 0:
             print(skipped, " further files skipped. Forgot to extract?")
 
-        self.trainingSamplesPrevious, self.trainingSamplesCurrent = [], []
+        self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.trainingY = [], [], []
 
         for dname in image_folders_only:
             set_name = os.path.basename(dname)
@@ -162,8 +162,8 @@ class CaltechLoader:
                 # after all frames of this video have been preprocessed, we can start creating pairs
                 print("Number of created training pairs:", len(self.trainingSamplesPrevious))
 
-                # TODO remove temp code: currently only max 300 pairs for speed up during development
-                if len(self.trainingSamplesPrevious) > 300:
+                # TODO remove temp code: currently only max 5000 pairs for speed up during development
+                if len(self.trainingSamplesPrevious) > 5000:
                     print("FORCE STOP");
                     break
 
@@ -189,6 +189,7 @@ class CaltechLoader:
         self.trainingSamplesCurrent = np.asarray(self.trainingSamplesCurrent, np.float16)
         self.trainingSamplesCurrent = np.swapaxes(self.trainingSamplesCurrent, 1, 3)
         self.trainingSamplesCurrent = np.swapaxes(self.trainingSamplesCurrent, 1, 2)
+        self.trainingY = np.asarray(self.trainingY, np.float16)
 
         if training:
             name = "caltech-training.p"
@@ -198,14 +199,16 @@ class CaltechLoader:
         # saving data to file
         if False: #TODO activate again
             print("saving data to file")
-            pickle.dump([self.trainingSamplesPrevious,self.trainingSamplesCurrent], open(os.path.join(self.output_dir, name), "wb"))
+            pickle.dump([self.trainingSamplesPrevious,self.trainingSamplesCurrent, self.trainingY], open(os.path.join(self.output_dir, name), "wb"))
 
         # TODO find better solution for test data fix
         if not training:
             self.testSamplesPrevious = self.trainingSamplesPrevious
             self.testSamplesCurrent = self.trainingSamplesCurrent
+            self.testY = self.trainingY
             self.trainingSamplesPrevious = None
             self.trainingSamplesCurrent = None
+            self.trainingY = None
 
         print("finished")
 
@@ -259,6 +262,7 @@ class CaltechLoader:
                     for datum_previous in data_prev:
                         if datum_previous['id'] == ped_id:
                             ped_exists_in_prev_frame = True
+                            x_prev, y_prev, w_prev, h_prev = [int(v) for v in datum_previous['pos']]
                             break;
 
                     if ped_exists_in_prev_frame:
@@ -272,13 +276,39 @@ class CaltechLoader:
                             # resize all images
                             # TODO check how to resize probably for different-ratio image patches
                             resized_image = cv.resize(img_ped, (self.image_width, self.image_height))
-                            resized_image_prev = cv.resize(img_ped_prev, (self.image_width, self.image_height))
 
+                            resized_image_prev = cv.resize(img_ped_prev, (self.image_width, self.image_height))
+                            w_resize_scale = self.image_width / float(w_real)
+                            h_resize_scale = self.image_height / float(h_real)
                             if type(resized_image) != np.ndarray:
                                 print("Hugh?")
 
                             self.trainingSamplesPrevious.append(resized_image_prev)
                             self.trainingSamplesCurrent.append(resized_image)
+
+                            # potential head position is supposed to be in the center of the current frame
+                            # but as we choose the image patch based on the previous and not the current frame,
+                            # the relative position is not guarenteed to be in the center. Calculate the relative
+                            # position and use it to generate a target probability map.
+                            # TODO check whether there is a better target position given in the caltech metadata
+                            absolute_center_x = x_prev + (w_prev / 2)
+                            absolute_center_y = y_prev + (h_prev / 4) #not center, but upper quarter #TODO verify that the upper and not the under quarter is used
+                            relative_center_x = absolute_center_x - x
+                            relative_center_y = absolute_center_y - y
+
+                            # scale center by same ratio as image
+                            relative_center_x *= w_resize_scale
+                            relative_center_y *= h_resize_scale
+
+                            # and halve again, because the ouput probability map has only 2px accuracy
+                            relative_center_x /= 2
+                            relative_center_y /= 2
+
+                            relative_center_x = round(relative_center_x)
+                            relative_center_y = round(relative_center_y)
+
+                            probs = self.calcTargetProbMap(relative_center_x, relative_center_y)
+                            self.trainingY.append( probs )
 
                             #self.save_img(set_name, video_name, frame_i, img_ped)
 
@@ -293,32 +323,25 @@ class CaltechLoader:
         self.loadDataSet(True)
 
         # get training data
-        XPrevious, XCurrent = self.trainingSamplesPrevious, self.trainingSamplesCurrent
-        Yall = self.calcTargetProbMap(XCurrent)
+        XPrevious, XCurrent, Y = self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.trainingY
 
-        return XPrevious, XCurrent, Yall
+        return XPrevious, XCurrent, Y
 
-    def calcTargetProbMap(self, currentFrames):
+    def calcTargetProbMap(self, center_x, center_y):
 
         # calculate target probability maps
-        # TODO check generation. right now, all maps are identical as the position of the head has been normalized
-        # to a specific position
-        # => or should the position still be unnormalized? and only the ratios are normalized? But how can the ped
-        # always be at the same position in the previous image??
-        sigma = 0.1
-        gxyBig = self.gkern(64, sigma)
-        leftrightborderremove = (64 - 24) / 2
-        gxyFit = gxyBig[:,
-                 leftrightborderremove:64 - leftrightborderremove]  # center/center will be used as the normalized position
+        sigma = 0.5
+        sigma_square = sigma * sigma
+        scores = np.zeros([64,24])
+        for x in range(24):
+            for y in range(64):
+                scores[y][x] = np.exp(-( np.square(x - center_x) + np.square(y - center_y)) / (2 * sigma_square))
 
         # use softmax to allow probability interpretations
-        gxyFit = self.softmax(gxyFit)
+        # TODO for some reason softmax is not returning reasonable results right now. fix it and turn it on again
+        probs = self.softmax(scores)
 
-        # copy same value as target probability map for all training samples
-        # TODO if it will really be the same for all, use single representation instead
-        Yall = np.full((currentFrames.shape[0], 64, 24), gxyFit)
-
-        return Yall
+        return probs
 
     def getTestData(self):
 

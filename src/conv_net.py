@@ -253,13 +253,19 @@ class ConvolutionalNetwork:
         with tf.name_scope("C3"):
 
             # merge all existing inputs to simulate further 3D convolutional ops
-            # TODO in the paper they propose using "10 random choices" instead of all 33. How to implement?
             c3_input = self.mergeChannels([
                 S2[0], S2[1], S2[2], S2[3], S2[4], S2[5], S2[6], S2[7], S2[8], S2[9],
                 S2[10], S2[11], S2[12], S2[13], S2[14], S2[15], S2[16], S2[17], S2[18], S2[19],
                 S2[20], S2[21], S2[22], S2[23], S2[24], S2[25], S2[26], S2[27], S2[28], S2[29],
                 S2[30], S2[31], S2[32]
             ])
+
+            # in the paper they propose using "10 random choices" instead of all 33. How to implement?
+            # dropout comes closest to this definition without keeping data untouched
+            if self.dropout_rate != 1.0:
+                with tf.name_scope("dropout"):
+                    self.dropout_prob = tf.placeholder(tf.float32)
+                    c3_input = tf.nn.dropout(c3_input, self.dropout_prob)
 
             self.conv3_filter_height = 7
             self.conv3_filter_width = 3
@@ -397,7 +403,8 @@ class ConvolutionalNetwork:
             # finally start training with current batch
             feed_dict ={self.x_previous:batch_data_previous,
                         self.x_current: batch_data_current,
-                        self.placeholder_labels:batch_labels} #TODO add dropout again ,self.dropout_prob: self.dropout_rate
+                        self.placeholder_labels:batch_labels,
+                        self.dropout_prob: self.dropout_rate}
             _, loss_value = self.session.run([train_op, loss],
                                      feed_dict)
 

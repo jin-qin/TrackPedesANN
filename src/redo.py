@@ -20,7 +20,7 @@ cf_learning_rate = 0.9
 cf_num_iters = 1000 #30.000 46 45 45
 cf_regularization_strength = 0 #0 means no regularization L2
 cf_learning_rate_decay = 0.95 #1 means no decay
-cf_dropout_rate = 0.75 # 1.0 = no dropout
+cf_dropout_rate = 0.5 # 1.0 = no dropout
 cf_optimizer = 2 # 0=GradientDescentOptimizer, 1=AdamOptimizer, 2=MomentumOptimizer(see also cf_momentum)
 cf_momentum = 0.9 #0 deactivates the momentum update. when activating/increasing you may want to decrease cf_learning_rate (the other way around, too).
 
@@ -188,7 +188,7 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
     log.log('.. L2 regularization active: {}'.format(cf_regularization_strength != 0))
     if cf_regularization_strength != 0:
         log.log('.. L2 regularization strength: {}'.format(cf_regularization_strength))
-    log.log('.. drop out active: {}'.format(cf_dropout_rate > 0 and cf_dropout_rate < 1))
+    log.log('.. drop out between S2 and C3 active: {}'.format(cf_dropout_rate > 0 and cf_dropout_rate < 1))
     if cf_dropout_rate > 0 and cf_dropout_rate < 1:
         log.log('.. drop out rate: {}'.format(cf_dropout_rate))
     log.log('.. total number of iterations: {}'.format(cf_num_iters))

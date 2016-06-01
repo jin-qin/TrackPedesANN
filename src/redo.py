@@ -16,13 +16,13 @@ cf_standardization = True #turn on either this or cf_min_max_scaling
 cf_log_auto_save = True #if True, the log file will be saved automatically as soon as all calculations have been finished correctly
 cf_log_dir = cf_log_dir_init = "logs"
 cf_batch_size = 100 #must divide number of images in all used datasets
-cf_learning_rate = 0.1
+cf_learning_rate = 0.9
 cf_num_iters = 1000 #30.000 46 45 45
-cf_regularization_strength = 0.1 #0 means no regularization L2
+cf_regularization_strength = 0 #0 means no regularization L2
 cf_learning_rate_decay = 0.95 #1 means no decay
 cf_dropout_rate = 0.75 # 1.0 = no dropout
-cf_optimizer = 0 # 0=GradientDescentOptimizer, 1=AdamOptimizer, 2=MomentumOptimizer(see also cf_momentum)
-cf_momentum = 0 #0 deactivates the momentum update. when activating/increasing you may want to decrease cf_learning_rate (the other way around, too).
+cf_optimizer = 2 # 0=GradientDescentOptimizer, 1=AdamOptimizer, 2=MomentumOptimizer(see also cf_momentum)
+cf_momentum = 0.9 #0 deactivates the momentum update. when activating/increasing you may want to decrease cf_learning_rate (the other way around, too).
 
 if cf_dataset == 0:
     cfc_dataset_name = 'Caltech'

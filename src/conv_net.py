@@ -333,8 +333,13 @@ class ConvolutionalNetwork:
         # loss function
         with tf.name_scope("loss"):
 
+            # tensorflow can only evaluate 2D results. So we just handle each pixel of the probability map as a single
+            # class => flattening needed
+            scoresFlattened = tf.reshape(self.scores, [self.batch_size, -1])
+            targetProbsFlattened = tf.reshape(self.placeholder_labels, [self.batch_size, -1])
 
-            cross_entropy = tf.nn.l2_loss(self.placeholder_labels - self.scores,
+            cross_entropy = tf.nn.softmax_cross_entropy_with_logits(scoresFlattened,
+                                                                    targetProbsFlattened,
                                                                            name="xentropy")
             loss = tf.reduce_mean(cross_entropy, name="xentropy_mean")
 

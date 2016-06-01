@@ -339,9 +339,9 @@ class CaltechLoader:
 
         # use softmax to allow probability interpretations
         # TODO for some reason softmax is not returning reasonable results right now. fix it and turn it on again
-        probs = self.softmax(scores)
+        #probs = self.softmax(scores)
 
-        return probs
+        return scores
 
     def getTestData(self):
 

@@ -15,7 +15,7 @@ class CaltechLoader:
 
         self.image_width = 48
         self.image_height = 128
-        self.image_size_min_resize = self.image_width / 2 # minimum length of minimum-length image length to allow resizing
+        self.image_size_min_resize = self.image_width * 1.25 #/ 2 # minimum length of minimum-length image length to allow resizing
         self.input_dir = os.path.join(root_dir, "caltech")
         self.output_dir = os.path.join(self.input_dir, "cached")
 

@@ -29,7 +29,6 @@ class CaltechLoader:
         cache_file = os.path.join(self.output_dir, name)
         if not self.cache or not os.path.exists(cache_file):
             log.log("No cached dataset has been found. Generate it once.")
-            # TODO do we need to normalize the images to set the face to a specific position??
             self.loadAnnotations()
             self.loadImages(training)
         else:
@@ -265,8 +264,13 @@ class CaltechLoader:
 
                     if ped_exists_in_prev_frame:
 
+                        # pedestrians face is supposed to be at the center of the given rectangle
+                        # TODO or do we need to normalize the images to set the face to a specific position??
                         img_ped = img_curr[y:y + h, x:x + w]
+
+
                         img_ped_prev = img_prev[y:y + h, x:x + w]
+
                         w_real = len(img_ped[0])
                         h_real = len(img_ped)
                         if not(w_real < self.image_size_min_resize or h_real < self.image_size_min_resize):

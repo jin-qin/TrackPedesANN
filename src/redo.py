@@ -10,6 +10,7 @@ import gc
 #cf = config
 #cfc = user config constant => do not change manually
 cfc_cache_dataset_hdd = True
+cf_validation_set_size = 10 #TODO increase! right now we're not yet using the validation data set, that's why it's so tiny # this absolute number of images will be taken from the training images and used as validation data
 cf_dataset = 0 # 0 => Caltech
 cf_timeout_minutes = 60 * 3 - 10 # maximum number of minutes used for training. 0=unlimited
 cf_min_max_scaling = True #turn on either this or cf_standardization
@@ -152,7 +153,8 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
         # TODO set correct ratio and maybe move to CaltechLoader
         log.log(".. resampling training and validation data")
         indices = np.random.permutation(XTrainPrevious.shape[0])
-        train_ids, val_ids = indices[:4000], indices[4000:] #TODO fix params when changing dataset size
+        trainingset_size = XTrainPrevious.shape[0] - cf_validation_set_size
+        train_ids, val_ids = indices[:trainingset_size], indices[trainingset_size:] #kepp in mind: fix params when changing dataset size
         XTrainPrevious, XTrainCurrent, XvalPrevious, XvalCurrent = XTrainPrevious[train_ids, :], XTrainCurrent[train_ids, :], XTrainPrevious[val_ids, :], XTrainCurrent[val_ids, :]
         Ytrain = Yall[train_ids]
         Yval = Yall[val_ids]

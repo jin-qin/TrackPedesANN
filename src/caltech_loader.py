@@ -6,10 +6,11 @@ from collections import defaultdict
 import numpy as np
 import cPickle as pickle
 import log
+import preprocessor
 
 class CaltechLoader:
 
-    def __init__(self, root_dir, cache):
+    def __init__(self, root_dir, cache, min_max_scaling=True, standardization=True):
 
         self.image_width = 48
         self.image_height = 128
@@ -17,6 +18,8 @@ class CaltechLoader:
         self.input_dir = os.path.join(root_dir, "caltech")
         self.output_dir = os.path.join(self.input_dir, "cached")
         self.cache = cache
+        self.min_max_scaling = min_max_scaling
+        self.standardization = standardization
 
     def loadDataSet(self,training):
 
@@ -188,6 +191,14 @@ class CaltechLoader:
         self.trainingSamplesCurrent = np.swapaxes(self.trainingSamplesCurrent, 1, 3)
         self.trainingSamplesCurrent = np.swapaxes(self.trainingSamplesCurrent, 1, 2)
         self.trainingY = np.asarray(self.trainingY, np.float16)
+
+        # preprocessing
+        pre = preprocessor.Preprocessor(self.trainingSamplesPrevious, self.min_max_scaling, self.standardization )
+        pre.preprocessData([self.trainingSamplesPrevious, self.trainingSamplesCurrent])
+        # TODO split up between training and validation data needs to be done before. otherwise validation data will be used for the calculations
+        #TODO preprocess validation data (and test data): self.XvalPrevious, self.XvalCurrent
+        # TODO whenever calling other instances (like live camera images in an application) they need to be preprocessed, too
+
 
         if training:
             name = "caltech-training.p"

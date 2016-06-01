@@ -11,8 +11,8 @@ import gc
 #cfc = user config constant => do not change manually
 cf_dataset = 0 # 0 => Caltech
 cf_timeout_minutes = 60 * 3 - 10 # maximum number of minutes used for training. 0=unlimited
-cf_min_max_scaling = False #turn on either this or cf_standardization #TODO turn on again
-cf_standardization = False #turn on either this or cf_min_max_scaling #TODO turn on again
+cf_min_max_scaling = True #turn on either this or cf_standardization
+cf_standardization = True #turn on either this or cf_min_max_scaling
 cf_log_auto_save = True #if True, the log file will be saved automatically as soon as all calculations have been finished correctly
 cf_log_dir = cf_log_dir_init = "logs"
 cf_batch_size = 100 #must divide number of images in all used datasets

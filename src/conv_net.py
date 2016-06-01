@@ -65,11 +65,13 @@ class ConvolutionalNetwork:
         # log.log( '.. Standard deviation W-init: {}.'.format(cf_standard_deviation_w_init) )
 
         # preprocessing (will change original data, too!)
-        log.log(".. preprocessing data") #TODO add self.XtrainCurrent and XvalCurrent
+        log.log(".. preprocessing data") #train only on previous images
         self.preprocessInit(min_max_scaling, standardization, self.XtrainPrevious)  # call this independently of the values of min_max_scaling or standardization!
         if min_max_scaling or standardization:
             self.preprocessData(self.XtrainPrevious)
+            self.preprocessData(self.XtrainCurrent)
             self.preprocessData(self.XvalPrevious)
+            self.preprocessData(self.XvalCurrent)
             #self.preprocessData(Xtest)
         log.log(".. finished preprocessing data")
 

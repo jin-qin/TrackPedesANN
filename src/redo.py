@@ -9,6 +9,7 @@ import gc
 
 #cf = config
 #cfc = user config constant => do not change manually
+cf_max_samples = 10000 # maximum number of loaded training samples. 0=unlimited
 cfc_cache_dataset_hdd = True # reminder: if this is turned on, and you want to change other settings, they might need a cache reset => clear folder
 cf_validation_set_size = 10 #TODO increase! right now we're not yet using the validation data set, that's why it's so tiny # this absolute number of images will be taken from the training images and used as validation data
 cf_dataset = 0 # 0 => Caltech
@@ -34,11 +35,11 @@ if cf_dataset == 0:
 
 def redo_finalize(Xtrain, Ytrain, Xval, Yval, saveLog):
 
-    global cfc_dataset_name, net, cfc_cache_dataset_hdd, cf_min_max_scaling, cf_standardization
+    global cfc_dataset_name, net, cfc_cache_dataset_hdd, cf_min_max_scaling, cf_standardization, cf_max_samples
 
     # if not already done, load test data
     if (cf_dataset != 0):
-        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_min_max_scaling, cf_standardization)
+        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling, cf_standardization)
         Xtest, Ytest = calLoader.getTestData()
 
         log.log('Loaded testset, which includes {} images.'.format(Xtest.shape[0]))
@@ -146,7 +147,7 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
 
     log.log('Loading ' + cfc_dataset_name + ' dataset..')
     if(cf_dataset == 0):
-        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_min_max_scaling, cf_standardization)
+        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling, cf_standardization)
         XTrainPrevious, XTrainCurrent, Yall = calLoader.getTrainingData()
 
         # resample training data to gain validation dataset

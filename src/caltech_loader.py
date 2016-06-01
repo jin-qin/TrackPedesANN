@@ -11,7 +11,7 @@ import tensorflow as tf
 
 class CaltechLoader:
 
-    def __init__(self, root_dir, cache, min_max_scaling=True, standardization=True):
+    def __init__(self, root_dir, cache, maxSamples=5000, min_max_scaling=True, standardization=True):
 
         self.image_width = 48
         self.image_height = 128
@@ -21,6 +21,7 @@ class CaltechLoader:
         self.cache = cache
         self.min_max_scaling = min_max_scaling
         self.standardization = standardization
+        self.maxSamples = maxSamples
 
     def loadDataSet(self,training):
 
@@ -165,8 +166,8 @@ class CaltechLoader:
                 # after all frames of this video have been preprocessed, we can start creating pairs
                 log.log("Number of created training pairs: {}".format(len(self.trainingSamplesPrevious)))
 
-                # TODO remove temp code: currently only max 5000 pairs for speed up during development
-                if len(self.trainingSamplesPrevious) > 5000:
+                # allow only max self.maxSamples pairs for speed up (during development)
+                if self.maxSamples > 0 and len(self.trainingSamplesPrevious) > self.maxSamples:
                     log.log("FORCE STOP");
                     break
 

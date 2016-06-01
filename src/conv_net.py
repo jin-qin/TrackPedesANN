@@ -324,11 +324,8 @@ class ConvolutionalNetwork:
             scoresFlattened = tf.reshape(self.scores, [self.batch_size, -1])
             targetProbsFlattened = tf.reshape(self.placeholder_labels, [self.batch_size, -1])
 
-            # apply softmax on target map
-            probs = tf.nn.softmax(targetProbsFlattened)
-
             cross_entropy = tf.nn.softmax_cross_entropy_with_logits(scoresFlattened,
-                                                                    probs,
+                                                                    targetProbsFlattened,
                                                                            name="xentropy")
             loss = tf.reduce_mean(cross_entropy, name="xentropy_mean")
 

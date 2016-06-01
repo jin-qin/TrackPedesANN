@@ -7,6 +7,7 @@ import numpy as np
 import cPickle as pickle
 import log
 import preprocessor
+import tensorflow as tf
 
 class CaltechLoader:
 
@@ -112,6 +113,7 @@ class CaltechLoader:
     def loadImages(self, training): # TODO implement training parameter to support loading of test data, too
 
         log.log("extracting frames")
+        self.tf_sess = tf.Session() #required for softmax
 
         # create output folder if it doesn't exist yet
         if not os.path.exists(self.output_dir):
@@ -218,6 +220,8 @@ class CaltechLoader:
             self.trainingSamplesPrevious = None
             self.trainingSamplesCurrent = None
             self.trainingY = None
+
+        self.tf_sess.close()
 
 
     def split_into_rgb_channels(self, image):
@@ -351,11 +355,9 @@ class CaltechLoader:
                 scores[y][x] = np.exp(-( np.square(x - center_x) + np.square(y - center_y)) / (2 * sigma_square))
 
         # use softmax to allow probability interpretations
-        # TODO for some reason softmax is not returning reasonable results right now. fix it and turn it on again
-        #(that's why currently tensorflows softmax is applied to Y,too)
-        #probs = self.softmax(scores)
+        probs = self.softmax(scores)
 
-        return scores
+        return probs
 
     def getTestData(self):
 
@@ -368,13 +370,8 @@ class CaltechLoader:
 
     def softmax(self, allScores):
 
-        # prevent overflow by subtracting a high constant from each term (doesn't change the final result, but the numbers during computation are smaller)
-        allScoresSmooth = allScores - allScores.max(axis=1,
-                                                    keepdims=True)  # use max per row (not total max) to ensure maximum numerical stability
+        # use tensorflow to apply softmax on target map
+        c = tf.nn.softmax(allScores)
+        probs = self.tf_sess.run(c)
 
-        # compute all needed values only once
-        e = np.exp(allScoresSmooth)
-
-        # keep in mind that allScores[i] contains 10 scores for one image
-        # so we need to divide each element by the sum of its row-sum, not by the whole sum
-        return e / e.sum(axis=1, keepdims=True)
+        return probs

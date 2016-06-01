@@ -16,7 +16,7 @@ cf_standardization = True #turn on either this or cf_min_max_scaling
 cf_log_auto_save = True #if True, the log file will be saved automatically as soon as all calculations have been finished correctly
 cf_log_dir = cf_log_dir_init = "logs"
 cf_batch_size = 100 #must divide number of images in all used datasets
-cf_learning_rate = 0.01
+cf_learning_rate = 0.1
 cf_size_fully_connected_layer = 1024
 cf_num_iters = 1000 #30.000 46 45 45
 cf_regularization_strength = 0.1 #0 means no regularization L2

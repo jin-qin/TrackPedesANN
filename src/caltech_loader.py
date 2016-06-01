@@ -149,7 +149,7 @@ class CaltechLoader:
                     if not ret:
                         break
 
-                    if previousFrame != None:
+                    if i > 0:
                         self.extractPedestriansFromImage(previousFrame, frame, set_name, video_name, i)
 
                     # TODO save original raw image on disk?

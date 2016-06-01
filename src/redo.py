@@ -9,6 +9,7 @@ import gc
 
 #cf = config
 #cfc = user config constant => do not change manually
+cfc_cache_dataset_hdd = True
 cf_dataset = 0 # 0 => Caltech
 cf_timeout_minutes = 60 * 3 - 10 # maximum number of minutes used for training. 0=unlimited
 cf_min_max_scaling = True #turn on either this or cf_standardization
@@ -32,11 +33,11 @@ if cf_dataset == 0:
 
 def redo_finalize(Xtrain, Ytrain, Xval, Yval, saveLog):
 
-    global cfc_dataset_name, net
+    global cfc_dataset_name, net, cfc_cache_dataset_hdd
 
     # if not already done, load test data
     if (cf_dataset != 0):
-        calLoader = cl.CaltechLoader(cfc_datasetpath)
+        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd)
         Xtest, Ytest = calLoader.getTestData()
 
         log.log('Loaded testset, which includes {} images.'.format(Xtest.shape[0]))
@@ -144,7 +145,7 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
 
     log.log('Loading ' + cfc_dataset_name + ' dataset..')
     if(cf_dataset == 0):
-        calLoader = cl.CaltechLoader(cfc_datasetpath)
+        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd)
         XTrainPrevious, XTrainCurrent, Yall = calLoader.getTrainingData()
 
         # resample training data to gain validation dataset

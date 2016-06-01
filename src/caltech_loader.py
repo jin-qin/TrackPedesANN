@@ -9,13 +9,14 @@ import log
 
 class CaltechLoader:
 
-    def __init__(self, root_dir):
+    def __init__(self, root_dir, cache):
 
         self.image_width = 48
         self.image_height = 128
         self.image_size_min_resize = self.image_width * 1.25 #/ 2 # minimum length of minimum-length image length to allow resizing
         self.input_dir = os.path.join(root_dir, "caltech")
         self.output_dir = os.path.join(self.input_dir, "cached")
+        self.cache = cache
 
     def loadDataSet(self,training):
 
@@ -26,7 +27,7 @@ class CaltechLoader:
 
         # if no data has been generated yet, generate it once
         cache_file = os.path.join(self.output_dir, name)
-        if True or not os.path.exists(cache_file): #TODO remove True or to enable caching again
+        if not self.cache or not os.path.exists(cache_file):
             log.log("No cached dataset has been found. Generate it once.")
             # TODO do we need to normalize the images to set the face to a specific position??
             self.loadAnnotations()
@@ -195,7 +196,7 @@ class CaltechLoader:
             name = "caltech-test.p"
 
         # saving data to file
-        if False: #TODO activate again
+        if self.cache:
             log.log("saving data to file")
             pickle.dump([self.trainingSamplesPrevious,self.trainingSamplesCurrent, self.trainingY], open(os.path.join(self.output_dir, name), "wb"))
 
@@ -239,7 +240,7 @@ class CaltechLoader:
 
     def extractPedestriansFromImage(self, img_prev, img_curr, set_name, video_name, frame_i):
 
-        # TODO when saving and loading json file before, we might need frame_i = str(frame_i)
+        # keep in mind: when saving and loading json file before, we might need frame_i = str(frame_i)
 
         if frame_i in self.annotations[set_name][video_name]['frames']:
             data = self.annotations[set_name][
@@ -336,6 +337,7 @@ class CaltechLoader:
 
         # use softmax to allow probability interpretations
         # TODO for some reason softmax is not returning reasonable results right now. fix it and turn it on again
+        #(that's why currently tensorflows softmax is applied to Y,too)
         #probs = self.softmax(scores)
 
         return scores

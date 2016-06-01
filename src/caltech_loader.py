@@ -10,7 +10,7 @@ import preprocessor
 
 class CaltechLoader:
 
-    def __init__(self, root_dir, cache, maxSamples=5000, min_max_scaling=True, standardization=True):
+    def __init__(self, root_dir, cache, maxSamples=5000, min_max_scaling=True, standardization=True, head_rel_pos_prev_row=0.25, head_rel_pos_prev_col=0.5):
 
         self.image_width = 48
         self.image_height = 128
@@ -21,6 +21,9 @@ class CaltechLoader:
         self.min_max_scaling = min_max_scaling
         self.standardization = standardization
         self.maxSamples = maxSamples
+        self.head_rel_pos_prev_row = head_rel_pos_prev_row
+        self.head_rel_pos_prev_col = head_rel_pos_prev_col
+
 
     def loadDataSet(self,training):
 
@@ -305,8 +308,8 @@ class CaltechLoader:
                             # the relative position is not guarenteed to be in the center. Calculate the relative
                             # position and use it to generate a target probability map.
                             # TODO check whether there is a better target position given in the caltech metadata
-                            absolute_center_x = x_prev + (w_prev / 2)
-                            absolute_center_y = y_prev + (h_prev / 4) #not center, but upper quarter #TODO verify that the upper and not the under quarter is used
+                            absolute_center_x = x_prev + (w_prev * self.head_rel_pos_prev_col)
+                            absolute_center_y = y_prev + (h_prev * self.head_rel_pos_prev_row) #not center, but upper quarter
                             relative_center_x = absolute_center_x - x
                             relative_center_y = absolute_center_y - y
 

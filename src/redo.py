@@ -27,6 +27,15 @@ cf_dropout_rate = 0.5 # 1.0 = no dropout
 cf_optimizer = 2 # 0=GradientDescentOptimizer, 1=AdamOptimizer, 2=MomentumOptimizer(see also cf_momentum)
 cf_momentum = 0.9 #0 deactivates the momentum update. when activating/increasing you may want to decrease cf_learning_rate (the other way around, too).
 
+# weight importance of direction vs. distance in accuracy measurements
+cf_accuracy_weight_direction = 0.8
+cf_accuracy_weight_distance = 1 - cf_accuracy_weight_direction
+
+# relative horizontale position assumed for the pedestrians head in the previous frame.
+cf_head_rel_pos_prev_row = 0.25 # 0=top, 1=bottom #TODO verify that the upper and not the lower quarter is used
+cf_head_rel_pos_prev_col = 0.5 # 0=left hand side, 1=right hand side, 0.5 = horizontale center
+
+
 if cf_dataset == 0:
     cfc_dataset_name = 'Caltech'
 #else:
@@ -39,7 +48,7 @@ def redo_finalize(Xtrain, Ytrain, Xval, Yval, saveLog):
 
     # if not already done, load test data
     if (cf_dataset != 0):
-        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling, cf_standardization)
+        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling, cf_standardization, cf_head_rel_pos_prev_row, cf_head_rel_pos_prev_col)
         Xtest, Ytest = calLoader.getTestData()
 
         log.log('Loaded testset, which includes {} images.'.format(Xtest.shape[0]))
@@ -147,7 +156,7 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
 
     log.log('Loading ' + cfc_dataset_name + ' dataset..')
     if(cf_dataset == 0):
-        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling, cf_standardization)
+        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling, cf_standardization, cf_head_rel_pos_prev_row, cf_head_rel_pos_prev_col)
         XTrainPrevious, XTrainCurrent, Yall = calLoader.getTrainingData()
 
         # resample training data to gain validation dataset
@@ -180,7 +189,11 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
                                    cf_timeout_minutes,
                                    cf_log_dir,
                                    cf_dropout_rate,
-                                   cf_optimizer)
+                                   cf_optimizer,
+                                   cf_head_rel_pos_prev_row,
+                                   cf_head_rel_pos_prev_col,
+                                   cf_accuracy_weight_direction,
+                                   cf_accuracy_weight_distance)
 
     # Training
     log.log('Start Training..')

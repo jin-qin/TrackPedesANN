@@ -16,7 +16,11 @@ class ConvolutionalNetwork:
                  timeout_minutes=0,
                  log_dir="logs",
                  dropout_rate=0.5,
-                 optimizer=0):
+                 optimizer=0,
+                 head_rel_pos_prev_row=0.25,
+                 head_rel_pos_prev_col=0.5,
+                 accuracy_weight_direction=0.8,
+                 accuracy_weight_distance=0.2):
 
         log.log('Creating network..')
 
@@ -38,8 +42,21 @@ class ConvolutionalNetwork:
         self.log_dir = log_dir
         self.dropout_rate = dropout_rate
         self.optimizer = optimizer
+        self.head_rel_pos_prev_row = head_rel_pos_prev_row
+        self.head_rel_pos_prev_col = head_rel_pos_prev_col
+        self.output_width = 24
+        self.output_height = 64
+        self.accuracy_weight_distance = accuracy_weight_distance
+        self.accuracy_weight_direction = accuracy_weight_direction
 
         # derive further params
+
+        # the (supposed) position of a pedestrian's head will always be the same for all PREVIOUS frames
+        # => once copy same value for one batch size, so we can use this during training
+        self.position_previous_2D_batch = np.full([self.batch_size, 2], 0)
+        for x in self.position_previous_2D_batch:
+            x[0] = self.output_height * self.head_rel_pos_prev_row
+            x[1] = self.output_width * self.head_rel_pos_prev_col
 
         # use original image shape, but resize the number of images to a single batch
         self.size_input = []
@@ -89,7 +106,7 @@ class ConvolutionalNetwork:
         #       => this is exactly what we need as the required input tensors need to be: [batch, in_height, in_width, in_channels]
         self.x_previous = tf.placeholder(tf.float32, shape=self.size_input, name="x_previous")
         self.x_current = tf.placeholder(tf.float32, shape=self.size_input, name="x_current")
-        self.placeholder_labels = tf.placeholder(tf.float32, shape=(self.size_input[0],64,24), name="y_pos_probs")
+        self.placeholder_labels = tf.placeholder(tf.float32, shape=(self.size_input[0],self.output_height,self.output_width), name="y_pos_probs")
 
 
 
@@ -271,7 +288,7 @@ class ConvolutionalNetwork:
             C3 = self.conv2d(c3_input, W_conv3) + b_conv3
 
         # (4 times??) upsamling to 24 x 64
-        C3 = tf.image.resize_images(C3, 64, 24)
+        C3 = tf.image.resize_images(C3, self.output_height, self.output_width)
 
         ##### GLOBAL BRANCH End #######
 
@@ -312,8 +329,8 @@ class ConvolutionalNetwork:
         C3 = tf.squeeze(C3)
         C4 = tf.squeeze(C4)
 
-        finalW1, finalB1 = self.vars_W_b([64, 24]) #finalB1 will not be used
-        finalW2, finalB2 = self.vars_W_b([64, 24])
+        finalW1, finalB1 = self.vars_W_b([self.output_height, self.output_width]) #finalB1 will not be used
+        finalW2, finalB2 = self.vars_W_b([self.output_height, self.output_width])
         self.scores =  tf.sigmoid(tf.mul(C3, finalW1) + tf.mul(C4, finalW2) + finalB2)
 
         # loss function
@@ -321,14 +338,14 @@ class ConvolutionalNetwork:
 
             # tensorflow can only evaluate 2D results. So we just handle each pixel of the probability map as a single
             # class => flattening needed
-            scoresFlattened = tf.reshape(self.scores, [self.batch_size, -1])
-            targetProbsFlattened = tf.reshape(self.placeholder_labels, [self.batch_size, -1])
+            self.scoresFlattened = tf.reshape(self.scores, [self.batch_size, -1])
+            self.targetProbsFlattened = tf.reshape(self.placeholder_labels, [self.batch_size, -1])
 
             # apply softmax on target map
-            probs = tf.nn.softmax(targetProbsFlattened)
+            self.targetProbsFlattened = tf.nn.softmax(self.targetProbsFlattened)
 
-            cross_entropy = tf.nn.softmax_cross_entropy_with_logits(scoresFlattened,
-                                                                    probs,
+            cross_entropy = tf.nn.softmax_cross_entropy_with_logits(self.scoresFlattened,
+                                                                    self.targetProbsFlattened,
                                                                            name="xentropy")
             loss = tf.reduce_mean(cross_entropy, name="xentropy_mean")
 
@@ -374,9 +391,28 @@ class ConvolutionalNetwork:
         init = tf.initialize_all_variables()
         self.session.run(init)
 
-        # this method will be used to calculate the current accuracy (create only once)
-        # TODO reimplement for non-integer values
-        #self.check_results = tf.nn.in_top_k(self.scores, self.placeholder_labels, 1)
+        ## accuracy Begin ###
+        position_predicted_2D = self.get_target_position(self.scoresFlattened)
+        position_real_2D = self.get_target_position(self.targetProbsFlattened)
+        movement_real = self.position_previous_2D_batch - position_real_2D
+        movement_predicted = self.position_previous_2D_batch - position_predicted_2D
+
+        # calculate difference in vector length (=distance of proposed movement)
+        distance_real = np.norm(movement_real)
+        distance_predicted = np.norm(movement_predicted)
+        if(distance_real > distance_predicted): # keep value always between 0 and 1: 1=best fit
+            diff_distance = distance_predicted / distance_real
+        else:
+            diff_distance = distance_real / distance_predicted
+
+        # calculate difference in angle
+        angle_degrees = self.angle_between_movements(movement_real, movement_predicted) #TODO
+        diff_direction = 1 - (angle_degrees / 180.0) #180 degrees = 0%, 0 = 100%
+
+        # combine angle and distance differences to total accuracy
+        self.check_results = self.accuracy_weight_direction * diff_direction + self.accuracy_weight_distance * diff_distance
+
+        ## accuracy End ###
 
         # allow saving results to file
         summary_writer = tf.train.SummaryWriter(os.path.join(self.log_dir, "tf-summary"), self.session.graph)
@@ -419,16 +455,15 @@ class ConvolutionalNetwork:
                 if (step + 1) != self.iterations:
                     log.log("Updated accuracies after {}/{} iterations:".format((step + 1), self.iterations))
 
-                    # 1/3: validation data TODO reuse
-                    #acc_val = self.accuracy(self.Xval, self.Yval)
-                    #log.log(" - validation: {0:.3f}%".format(acc_val * 100))
+                    # 1/3: validation data
+                    acc_val = self.accuracy(self.Xval, self.Yval)
+                    log.log(" - validation: {0:.3f}%".format(acc_val * 100))
 
             if (step + 1) % interrupt_every_x_steps_late == 0 and (step + 1) != self.iterations: #don't print in last run as this will be done anyway
 
-                # 2/3: training data TODO reuse
-                True
-                #acc_train = self.accuracy(self.Xtrain, self.Ytrain)
-                #log.log(" - training: {0:.3f}%".format(acc_train * 100))
+                # 2/3: training data
+                acc_train = self.accuracy(self.Xtrain, self.Ytrain)
+                log.log(" - training: {0:.3f}%".format(acc_train * 100))
 
                 # 3/3: test data
                 # acc_test = self.accuracy(self.Xtest, self.Ytest)
@@ -448,9 +483,20 @@ class ConvolutionalNetwork:
 
 
 
+    def get_target_position(self, probs_1d):
+
+        # TODO does this give the correct position?
+        # TODO (not needed for accuracy, but for "real" tracking:) scale is still 0.5, so we need to multiply by 2
+        position_predicted_1D = tf.argmax(probs_1d, 1)
+        row = position_predicted_1D / self.output_width  # needs to be floored
+        column = position_predicted_1D % self.output_width
+        position_predicted_2D = np.concatenate([row,column],1)
+
+        return position_predicted_2D
+
     def accuracy(self, x, y):
         num_iter = int(math.ceil(x.shape[0] / self.batch_size))
-        true_count = 0  # Counts the number of correct predictions.
+        true_count = 0  # sum up all single accuracies
         total_sample_count = num_iter * self.batch_size
         step = 0
         while step < num_iter:
@@ -466,9 +512,6 @@ class ConvolutionalNetwork:
         return precision
 
 
-
-
-
     def closeSession(self):
         # we're done here
         self.session.close()
@@ -480,5 +523,34 @@ class ConvolutionalNetwork:
 
     def mergeChannels(self,inputs):
         return tf.concat(3, inputs)
+
+    # TODO replace by native methods. only used for a
+    def dot(self, vA, vB):
+        return vA[0] * vB[0] + vA[1] * vB[1]
+
+    # source: http://stackoverflow.com/questions/28260962/calculating-angles-between-line-segments-python-with-math-atan2
+    # returns angle between the two lines in range of 0 to 180
+    def angle_between_movements(self, lineA, lineB):
+        # Get nicer vector form
+        vA = [(lineA[0][0] - lineA[1][0]), (lineA[0][1] - lineA[1][1])]
+        vB = [(lineB[0][0] - lineB[1][0]), (lineB[0][1] - lineB[1][1])]
+        # Get dot prod
+        dot_prod = self.dot(vA, vB)
+        # Get magnitudes
+        magA = self.dot(vA, vA) ** 0.5
+        magB = self.dot(vB, vB) ** 0.5
+        # Get cosine value
+        cos_ = dot_prod / magA / magB
+        # Get angle in radians and then convert to degrees
+        angle = math.acos(dot_prod / magB / magA)
+        # Basically doing angle <- angle mod 360
+        ang_deg = math.degrees(angle) % 360
+
+        if ang_deg - 180 >= 0:
+            # As in if statement
+            return 360 - ang_deg
+        else:
+
+            return ang_deg
 
 

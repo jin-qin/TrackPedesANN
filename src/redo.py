@@ -13,7 +13,7 @@ cf_max_samples = 10000 # maximum number of loaded training samples. 0=unlimited
 cfc_cache_dataset_hdd = True # reminder: if this is turned on, and you want to change other settings, they might need a cache reset => clear folder
 cf_validation_set_size = 10 #TODO increase! right now we're not yet using the validation data set, that's why it's so tiny # this absolute number of images will be taken from the training images and used as validation data
 cf_dataset = 0 # 0 => Caltech
-cf_timeout_minutes = 60 * 3 - 10 # maximum number of minutes used for training. 0=unlimited
+cf_timeout_minutes = 0 # maximum number of minutes used for training. 0=unlimited
 cf_min_max_scaling = True #turn on either this or cf_standardization
 cf_standardization = True #turn on either this or cf_min_max_scaling
 cf_log_auto_save = True #if True, the log file will be saved automatically as soon as all calculations have been finished correctly

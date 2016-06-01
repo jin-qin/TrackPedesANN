@@ -9,17 +9,12 @@ class ConvolutionalNetwork:
     def __init__(self, XtrainPrevious, XtrainCurrent, Ytrain, XvalPrevious, XvalCurrent, Yval, min_max_scaling=True, standardization=True,
                  batch_size=200,
                  learning_rate=0.01,
-                 size_full=300,
                  iterations=3000,
                  regularization_strength=0.01,
                  learning_rate_decay=0.96,
                  momentum=0,
                  timeout_minutes=0,
-                 conv_filter_size=5,
-                 number_of_filters_conv1=32,
-                 number_of_filters_conv2=32,
                  log_dir="logs",
-                 number_of_conv_layers=2,
                  dropout_rate=0.5,
                  optimizer=0):
 
@@ -34,18 +29,13 @@ class ConvolutionalNetwork:
         self.Yval = Yval
         self.batch_size = batch_size
         self.starter_learning_rate = learning_rate
-        self.size_full = size_full
         self.iterations = iterations
         self.regularization_strength = regularization_strength
         self.learning_rate_decay = learning_rate_decay
         self.momentum = momentum
         self.timeout_minutes = timeout_minutes # maximum number of minutes used for training. 0=unlimited
         self.timeout_seconds = self.timeout_minutes * 60
-        self.conv_filter_size = conv_filter_size
-        self.number_of_filters_conv1 = number_of_filters_conv1
-        self.number_of_filters_conv2 = number_of_filters_conv2
         self.log_dir = log_dir
-        self.number_of_conv_layers = number_of_conv_layers
         self.dropout_rate = dropout_rate
         self.optimizer = optimizer
 
@@ -61,7 +51,6 @@ class ConvolutionalNetwork:
                 self.size_input.append(self.batch_size)
 
         log.log('.. Input dimension: {}.'.format(self.size_input))
-        log.log( '.. Fully-connected layer dimension: {}.'.format(self.size_full) )
         # log.log( '.. Standard deviation W-init: {}.'.format(cf_standard_deviation_w_init) )
 
         # preprocessing (will change original data, too!)

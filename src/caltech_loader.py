@@ -1,13 +1,11 @@
 import os
 import glob
-import json
-import gc
 from scipy.io import loadmat
 import cv2 as cv
 from collections import defaultdict
 import numpy as np
 import cPickle as pickle
-import scipy.stats as st
+import log
 
 class CaltechLoader:
 
@@ -29,19 +27,19 @@ class CaltechLoader:
         # if no data has been generated yet, generate it once
         cache_file = os.path.join(self.output_dir, name)
         if True or not os.path.exists(cache_file): #TODO remove True or to enable caching again
-            print("No cached dataset has been found. Generate it once.")
+            log.log("No cached dataset has been found. Generate it once.")
             # TODO do we need to normalize the images to set the face to a specific position??
             self.loadAnnotations()
             self.loadImages(training)
         else:
-            print("Cached caltech dataset has been found. Start loading..")
+            log.log("Cached caltech dataset has been found. Start loading..")
 
             if training:
                 self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.trainingY = pickle.load(open(cache_file, "rb"))
             else:
                 self.testSamplesPrevious, self.testSamplesCurrent, self.testY = pickle.load(open(cache_file, "rb"))
 
-            print("Finished cached data import.")
+            log.log("Finished cached data import.")
 
     # loads all annotations to self.annotations
     # original source: https://github.com/mitmul/caltech-pedestrian-dataset-converter/blob/master/scripts/convert_annotations.py
@@ -51,7 +49,7 @@ class CaltechLoader:
         self.annotations = defaultdict(dict)
         for dname in sorted(glob.glob(os.path.join(self.input_dir, 'annotations/set*'))):
             set_name = os.path.basename(dname)
-            print("Annotations from set", set_name)
+            log.log("Annotations from set {}".format(set_name))
             self.annotations[set_name] = defaultdict(dict)
             for anno_fn in sorted(glob.glob('{}/*.vbb'.format(dname))):
                 vbb = loadmat(anno_fn)
@@ -64,13 +62,13 @@ class CaltechLoader:
                 objEnd = vbb['A'][0][0][6][0]
                 objHide = vbb['A'][0][0][7][0]
                 altered = int(vbb['A'][0][0][8][0][0])
-                log = vbb['A'][0][0][9][0]
+                log2 = vbb['A'][0][0][9][0]
                 logLen = int(vbb['A'][0][0][10][0][0])
 
                 video_name = os.path.splitext(os.path.basename(anno_fn))[0]
                 self.annotations[set_name][video_name]['nFrame'] = nFrame
                 self.annotations[set_name][video_name]['maxObj'] = maxObj
-                self.annotations[set_name][video_name]['log'] = log.tolist()
+                self.annotations[set_name][video_name]['log'] = log2.tolist()
                 self.annotations[set_name][video_name]['logLen'] = logLen
                 self.annotations[set_name][video_name]['altered'] = altered
                 self.annotations[set_name][video_name]['frames'] = defaultdict(list)
@@ -101,7 +99,7 @@ class CaltechLoader:
 
                 all_obj += n_obj
 
-        print('Number of objects:', all_obj)
+        log.log('Number of objects: {}'.format(all_obj))
 
         # TODO save as json?
         #json.dump(self.annotations, open(os.path.join(self.output_dir, '/annotations.json', 'w')))
@@ -110,7 +108,7 @@ class CaltechLoader:
     # original source: https://github.com/mitmul/caltech-pedestrian-dataset-converter/blob/master/scripts/convert_seqs.py
     def loadImages(self, training): # TODO implement training parameter to support loading of test data, too
 
-        print("extracting frames")
+        log.log("extracting frames")
 
         # create output folder if it doesn't exist yet
         if not os.path.exists(self.output_dir):
@@ -124,22 +122,22 @@ class CaltechLoader:
             if os.path.isdir(dname):
                 image_folders_only.append(dname)
 
-        print(len(image_folders_only), " extracted image sets found")
+        log.log("{} extracted image sets found".format(len(image_folders_only)))
         skipped = len(imagesets) - len(image_folders_only)
         if skipped > 0:
-            print(skipped, " further files skipped. Forgot to extract?")
+            log.log("{} further files skipped. Forgot to extract?".format(skipped))
 
         self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.trainingY = [], [], []
 
         for dname in image_folders_only:
             set_name = os.path.basename(dname)
 
-            print("Processing set ", set_name)
+            log.log("Processing set {}".format(set_name))
 
             for fn in sorted(glob.glob('{}/*.seq'.format(dname))):
                 video_name = os.path.splitext(os.path.basename(fn))[0]
 
-                print("Processing video ", set_name, video_name)
+                log.log("Processing video {} {}".format(set_name, video_name))
 
                 cap = cv.VideoCapture(fn)
                 previousFrame = None
@@ -160,19 +158,19 @@ class CaltechLoader:
 
 
                 # after all frames of this video have been preprocessed, we can start creating pairs
-                print("Number of created training pairs:", len(self.trainingSamplesPrevious))
+                log.log("Number of created training pairs: {}".format(len(self.trainingSamplesPrevious)))
 
                 # TODO remove temp code: currently only max 5000 pairs for speed up during development
                 if len(self.trainingSamplesPrevious) > 5000:
-                    print("FORCE STOP");
+                    log.log("FORCE STOP");
                     break
 
 
-                print(fn)
+                log.log(fn)
 
 
-        print("Finished frame extraction and matching.")
-        print("Calculate additional gradient channels")
+        log.log("Finished frame extraction and matching.")
+        log.log("Calculate additional gradient channels")
 
 
         # add gradient channels
@@ -180,7 +178,7 @@ class CaltechLoader:
             self.trainingSamplesPrevious[i] = self.wrapImage(self.trainingSamplesPrevious[i])
             self.trainingSamplesCurrent[i] = self.wrapImage(self.trainingSamplesCurrent[i])
 
-        print("Finished gradient calculations.")
+        log.log("Finished gradient calculations.")
 
         # convert to np
         self.trainingSamplesPrevious = np.asarray(self.trainingSamplesPrevious, np.float16)
@@ -198,7 +196,7 @@ class CaltechLoader:
 
         # saving data to file
         if False: #TODO activate again
-            print("saving data to file")
+            log.log("saving data to file")
             pickle.dump([self.trainingSamplesPrevious,self.trainingSamplesCurrent, self.trainingY], open(os.path.join(self.output_dir, name), "wb"))
 
         # TODO find better solution for test data fix
@@ -210,7 +208,6 @@ class CaltechLoader:
             self.trainingSamplesCurrent = None
             self.trainingY = None
 
-        print("finished")
 
     def split_into_rgb_channels(self, image):
         '''Split the target image into its red, green and blue channels.
@@ -281,7 +278,7 @@ class CaltechLoader:
                             w_resize_scale = self.image_width / float(w_real)
                             h_resize_scale = self.image_height / float(h_real)
                             if type(resized_image) != np.ndarray:
-                                print("Hugh?")
+                                log.log("Hugh?")
 
                             self.trainingSamplesPrevious.append(resized_image_prev)
                             self.trainingSamplesCurrent.append(resized_image)

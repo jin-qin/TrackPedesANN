@@ -69,7 +69,7 @@ class CaltechLoader:
         self.annotations = defaultdict(dict)
         for dname in sorted(glob.glob(os.path.join(self.input_dir, 'annotations/set*'))):
             set_name = os.path.basename(dname)
-            log.log("Annotations from set {}".format(set_name))
+            log.log("Parsing annotations from set {}".format(set_name))
             self.annotations[set_name] = defaultdict(dict)
             for anno_fn in sorted(glob.glob('{}/*.vbb'.format(dname))):
                 vbb = loadmat(anno_fn)
@@ -119,16 +119,12 @@ class CaltechLoader:
 
                 all_obj += n_obj
 
-        log.log('Number of objects: {}'.format(all_obj))
-
-        # TODO save as json?
-        #json.dump(self.annotations, open(os.path.join(self.output_dir, '/annotations.json', 'w')))
-
+        log.log('Total number of annotations: {}'.format(all_obj))
 
     # original source: https://github.com/mitmul/caltech-pedestrian-dataset-converter/blob/master/scripts/convert_seqs.py
-    def loadImages(self, training): # TODO implement training parameter to support loading of test data, too
+    def loadImages(self, training):
 
-        log.log("extracting frames")
+        log.log("Extracting frames")
 
         # create output folder if it doesn't exist yet
         if not os.path.exists(self.output_dir):
@@ -153,119 +149,118 @@ class CaltechLoader:
 
         x_prev, x_curr, y = [], [], []
 
-        for dname in image_folders_only:
-            set_name = os.path.basename(dname)
+        if len(image_folders_only) > 0:
 
-            log.log("Processing set {}".format(set_name))
+            for dname in image_folders_only:
+                set_name = os.path.basename(dname)
 
-            for fn in sorted(glob.glob('{}/*.seq'.format(dname))):
-                video_name = os.path.splitext(os.path.basename(fn))[0]
+                log.log("Processing set {}".format(set_name))
 
-                log.log("Processing video {} {}".format(set_name, video_name))
+                for fn in sorted(glob.glob('{}/*.seq'.format(dname))):
+                    video_name = os.path.splitext(os.path.basename(fn))[0]
 
-                cap = cv.VideoCapture(fn)
-                previousFrame = None
-                i = 0
-                while True:
-                    ret, frame = cap.read()
-                    if not ret:
+                    log.log("Processing video {} of {}".format(video_name, set_name))
+
+                    cap = cv.VideoCapture(fn)
+                    previousFrame = None
+                    i = 0
+                    while True:
+                        ret, frame = cap.read()
+                        if not ret:
+                            break
+
+                        if i > 0:
+                            self.extractPedestriansFromImage(previousFrame, frame, set_name, video_name, i, x_prev, x_curr, y)
+
+                        # TODO save original raw image on disk?
+                        #self.save_img(dname, fn, i, frame)
+
+                        previousFrame = frame
+                        i += 1
+
+
+                    # after all frames of this video have been preprocessed, we can start creating pairs
+                    log.log("Number of created sample pairs: {}".format(len(x_prev)))
+
+                    # allow only max self.maxSamples pairs for speed up (during development)
+                    if self.maxSamples > 0 and len(x_prev) > self.maxSamples:
+                        log.log("FORCE STOP of dataset loading as the maximum number of samples has been reached");
                         break
 
-                    if i > 0:
-                        self.extractPedestriansFromImage(previousFrame, frame, set_name, video_name, i, x_prev, x_curr, y)
 
-                    # TODO save original raw image on disk?
-                    #self.save_img(dname, fn, i, frame)
-
-                    previousFrame = frame
-                    i += 1
+            log.log("Finished frame extraction and matching.")
+            log.log("Calculate additional gradient channels")
 
 
-                # after all frames of this video have been preprocessed, we can start creating pairs
-                log.log("Number of created training pairs: {}".format(len(x_prev)))
+            # add gradient channels
+            for i in range(len(x_curr)): #indexes 0-4: previous image. 5-9:current image
+                x_prev[i] = self.wrapImage(x_prev[i])
+                x_curr[i] = self.wrapImage(x_curr[i])
 
-                # allow only max self.maxSamples pairs for speed up (during development)
-                if self.maxSamples > 0 and len(x_prev) > self.maxSamples:
-                    log.log("FORCE STOP");
-                    break
+            log.log("Finished gradient calculations.")
 
+            # convert to np
+            x_prev = np.asarray(x_prev, np.float16)
+            x_prev = np.swapaxes(x_prev, 1, 3)
+            x_prev = np.swapaxes(x_prev, 1, 2)
+            x_curr = np.asarray(x_curr, np.float16)
+            x_curr = np.swapaxes(x_curr, 1, 3)
+            x_curr = np.swapaxes(x_curr, 1, 2)
+            y = np.asarray(y, np.float16)
 
-                log.log(fn)
+            # resample training data to gain validation dataset
+            # (needs to be done before preprocessing. otherwise validation data will be used for the calculations)
+            if training:
+                log.log(".. resampling training and validation data")
+                indices = np.random.permutation(x_prev.shape[0])
+                trainingset_size = x_prev.shape[0] - self.validation_set_size
+                train_ids, val_ids = indices[:trainingset_size], indices[trainingset_size:]  # keep in mind: fix params when changing dataset size
+                x_prev, x_curr, self.validationSamplesPrevious, self.validationSamplesCurrent = x_prev[train_ids, :], x_curr[train_ids,:],\
+                                                                           x_prev[val_ids,:], x_curr[val_ids, :]
+                y, self.validationY = y[train_ids], y[val_ids]
 
-
-        log.log("Finished frame extraction and matching.")
-        log.log("Calculate additional gradient channels")
-
-
-        # add gradient channels
-        for i in range(len(x_curr)): #indexes 0-4: previous image. 5-9:current image
-            x_prev[i] = self.wrapImage(x_prev[i])
-            x_curr[i] = self.wrapImage(x_curr[i])
-
-        log.log("Finished gradient calculations.")
-
-        # convert to np
-        x_prev = np.asarray(x_prev, np.float16)
-        x_prev = np.swapaxes(x_prev, 1, 3)
-        x_prev = np.swapaxes(x_prev, 1, 2)
-        x_curr = np.asarray(x_curr, np.float16)
-        x_curr = np.swapaxes(x_curr, 1, 3)
-        x_curr = np.swapaxes(x_curr, 1, 2)
-        y = np.asarray(y, np.float16)
-
-        # resample training data to gain validation dataset
-        # (needs to be done before preprocessing. otherwise validation data will be used for the calculations)
-        if training:
-            log.log(".. resampling training and validation data")
-            indices = np.random.permutation(x_prev.shape[0])
-            trainingset_size = x_prev.shape[0] - self.validation_set_size
-            train_ids, val_ids = indices[:trainingset_size], indices[trainingset_size:]  # keep in mind: fix params when changing dataset size
-            x_prev, x_curr, self.validationSamplesPrevious, self.validationSamplesCurrent = x_prev[train_ids, :], x_curr[train_ids,:],\
-                                                                       x_prev[val_ids,:], x_curr[val_ids, :]
-            y, self.validationY = y[train_ids], y[val_ids]
-
-            # if we are loading training data, we need to initialize the preprocessor once and also preprocess validation data
-            self.preprocessor = pp.Preprocessor(x_prev, self.min_max_scaling, self.standardization)
-            self.preprocessor.preprocessData([self.validationSamplesPrevious, self.validationSamplesCurrent])
+                # if we are loading training data, we need to initialize the preprocessor once and also preprocess validation data
+                self.preprocessor = pp.Preprocessor(x_prev, self.min_max_scaling, self.standardization)
+                self.preprocessor.preprocessData([self.validationSamplesPrevious, self.validationSamplesCurrent])
 
 
-        # this is valid for training as well as for test data
-        self.preprocessor.preprocessData([x_prev, x_curr])
+            # this is valid for training as well as for test data
+            self.preprocessor.preprocessData([x_prev, x_curr])
 
 
-        # TODO whenever calling other instances (like live camera images in an application) they need to be preprocessed, too
+            # TODO whenever calling other instances (like live camera images in an application) they need to be preprocessed, too
 
 
-        # datasets are ready! rename and save..
-        if training:
+            # datasets are ready! rename and save..
+            if training:
 
-            self.trainingSamplesPrevious = x_prev
-            self.trainingSamplesCurrent = x_curr
-            self.trainingY = y
+                self.trainingSamplesPrevious = x_prev
+                self.trainingSamplesCurrent = x_curr
+                self.trainingY = y
 
-            # saving data to file
-            if self.cache:
-                name = "caltech-training.p"
-                log.log("saving training data to file")
-                pickle.dump([self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.trainingY],
-                            open(os.path.join(self.output_dir, name), "wb"))
+                # saving data to file
+                if self.cache:
+                    name = "caltech-training.p"
+                    log.log("saving training data to file")
+                    pickle.dump([self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.trainingY],
+                                open(os.path.join(self.output_dir, name), "wb"))
 
-                name = "caltech-validation.p"
-                log.log("saving validation data to file")
-                pickle.dump([self.validationSamplesPrevious, self.validationSamplesCurrent, self.validationY],
-                            open(os.path.join(self.output_dir, name), "wb"))
+                    name = "caltech-validation.p"
+                    log.log("saving validation data to file")
+                    pickle.dump([self.validationSamplesPrevious, self.validationSamplesCurrent, self.validationY],
+                                open(os.path.join(self.output_dir, name), "wb"))
 
-        else:
-            self.testSamplesPrevious = x_prev
-            self.testSamplesCurrent = x_curr
-            self.testY = y
+            else:
+                self.testSamplesPrevious = x_prev
+                self.testSamplesCurrent = x_curr
+                self.testY = y
 
-            # saving data to file
-            if self.cache:
-                name = "caltech-test.p"
-                log.log("saving test data to file")
-                pickle.dump([self.testSamplesPrevious, self.testSamplesCurrent, self.testY],
-                            open(os.path.join(self.output_dir, name), "wb"))
+                # saving data to file
+                if self.cache:
+                    name = "caltech-test.p"
+                    log.log("saving test data to file")
+                    pickle.dump([self.testSamplesPrevious, self.testSamplesCurrent, self.testY],
+                                open(os.path.join(self.output_dir, name), "wb"))
 
 
 

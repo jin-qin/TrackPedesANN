@@ -349,11 +349,6 @@ class ConvolutionalNetwork:
                                                                            name="xentropy")
             loss = tf.reduce_mean(cross_entropy, name="xentropy_mean")
 
-        # add L2 regularization #TODO
-        #if self.regularization_strength != 0:
-        #    regularizers = tf.nn.l2_loss(W_full) + tf.nn.l2_loss(b_full) + tf.nn.l2_loss(W_softmax) + tf.nn.l2_loss(b_softmax)
-        #    reg = tf.constant(self.regularization_strength, dtype=tf.float32)
-        #    loss += reg * regularizers
 
         # Create a variable to track the global step (should be equal to the index var "step" in the following for loop)
         global_step = tf.Variable(0, name='global_step', trainable=False)
@@ -398,8 +393,9 @@ class ConvolutionalNetwork:
         movement_predicted = self.position_previous_2D_batch - position_predicted_2D
 
         # calculate difference in vector length (=distance of proposed movement)
-        distance_real = self.tf_norm_batch(movement_real)
-        distance_predicted = self.tf_norm_batch(movement_predicted)
+        # (+ 0.0001 to prevent division by zero, which could occur in angle_between_movements() as well as calc of diff_distance)
+        distance_real = self.tf_norm_batch(movement_real) + 0.0001
+        distance_predicted = self.tf_norm_batch(movement_predicted) + 0.0001
 
         # keep value always between 0 and 1: 1=best fit
         diff_distance = tf.minimum(distance_predicted, distance_real) / tf.maximum(distance_predicted, distance_real)
@@ -416,8 +412,8 @@ class ConvolutionalNetwork:
         # allow saving results to file
         summary_writer = tf.train.SummaryWriter(os.path.join(self.log_dir, "tf-summary"), self.session.graph)
 
-        interrupt_every_x_steps = min(self.iterations / 2.5, 1000, 1) #TODO remove ", 10" on computer with higher performance
-        interrupt_every_x_steps_late = 1; #TODO set back to: self.iterations / 2
+        interrupt_every_x_steps = min(self.iterations / 2.5, 1000, 10) #TODO remove ", 10" on computer with higher performance
+        interrupt_every_x_steps_late = max(self.iterations / 4, 1)
         for step in range(self.iterations):
 
             # get a batch of training samples

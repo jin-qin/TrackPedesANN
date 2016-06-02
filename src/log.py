@@ -10,6 +10,8 @@ def logSetName(pName):
     log_name = pName
 
 def log(pMsg, pConsole=True, pFile=True):
+    global log_cache
+
     msg = time.strftime('%X') + ": " + pMsg
     if pConsole:
         print(msg)
@@ -18,6 +20,7 @@ def log(pMsg, pConsole=True, pFile=True):
 
 
 def logSave(directory):
+    global log_cache, log_name
 
     #create dir if it does not exist yet
     if not os.path.exists(directory):
@@ -32,4 +35,5 @@ def logSave(directory):
     logClear()
 
 def logClear():
-    log_cache.clear()
+    global log_cache
+    log_cache = []

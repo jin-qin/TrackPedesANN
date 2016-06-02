@@ -10,7 +10,6 @@ class ConvolutionalNetwork:
                  batch_size=200,
                  learning_rate=0.01,
                  iterations=3000,
-                 regularization_strength=0.01,
                  learning_rate_decay=0.96,
                  momentum=0,
                  timeout_minutes=0,
@@ -34,7 +33,6 @@ class ConvolutionalNetwork:
         self.batch_size = batch_size
         self.starter_learning_rate = learning_rate
         self.iterations = iterations
-        self.regularization_strength = regularization_strength
         self.learning_rate_decay = learning_rate_decay
         self.momentum = momentum
         self.timeout_minutes = timeout_minutes # maximum number of minutes used for training. 0=unlimited

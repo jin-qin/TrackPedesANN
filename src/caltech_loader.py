@@ -255,12 +255,21 @@ class CaltechLoader:
     def extractPedestriansFromImage(self, img_prev, img_curr, set_name, video_name, frame_i):
 
         # keep in mind: when saving and loading json file before, we might need frame_i = str(frame_i)
+        try:
+            in_prev_frame = (frame_i -1) in self.annotations[set_name][video_name]['frames']
+            in_curr_frame = frame_i in self.annotations[set_name][video_name]['frames']
 
-        if frame_i in self.annotations[set_name][video_name]['frames']:
-            data = self.annotations[set_name][
-                video_name]['frames'][frame_i]
-            data_prev = self.annotations[set_name][
-                video_name]['frames'][frame_i -1]
+        except Exception as e:
+            in_curr_frame = in_prev_frame = False
+
+            log,log("Error during annotation check. Have you forgotten to provide annotations for all datasets?")
+
+
+
+        if in_prev_frame and in_curr_frame:
+
+            data = self.annotations[set_name][video_name]['frames'][frame_i]
+            data_prev = self.annotations[set_name][video_name]['frames'][(frame_i -1)]
 
             for datum in data:
                 ped_id = datum['id']

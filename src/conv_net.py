@@ -53,7 +53,7 @@ class ConvolutionalNetwork:
 
         # the (supposed) position of a pedestrian's head will always be the same for all PREVIOUS frames
         # => once copy same value for one batch size, so we can use this during training
-        self.position_previous_2D_batch = np.full([self.batch_size, 2], 0)
+        self.position_previous_2D_batch = np.zeros([self.batch_size, 2])
         for x in self.position_previous_2D_batch:
             x[0] = self.output_height * self.head_rel_pos_prev_row
             x[1] = self.output_width * self.head_rel_pos_prev_col
@@ -398,16 +398,15 @@ class ConvolutionalNetwork:
         movement_predicted = self.position_previous_2D_batch - position_predicted_2D
 
         # calculate difference in vector length (=distance of proposed movement)
-        distance_real = np.norm(movement_real)
-        distance_predicted = np.norm(movement_predicted)
-        if(distance_real > distance_predicted): # keep value always between 0 and 1: 1=best fit
-            diff_distance = distance_predicted / distance_real
-        else:
-            diff_distance = distance_real / distance_predicted
+        distance_real = self.tf_norm_batch(movement_real)
+        distance_predicted = self.tf_norm_batch(movement_predicted)
 
-        # calculate difference in angle
-        angle_degrees = self.angle_between_movements(movement_real, movement_predicted) #TODO
-        diff_direction = 1 - (angle_degrees / 180.0) #180 degrees = 0%, 0 = 100%
+        # keep value always between 0 and 1: 1=best fit
+        diff_distance = tf.minimum(distance_predicted, distance_real) / tf.maximum(distance_predicted, distance_real)
+
+        # calculate difference in rad
+        angle_rad = self.angle_between_movements(movement_real, movement_predicted, distance_real, distance_predicted)
+        diff_direction = 1 - (angle_rad / math.pi) #180 degrees = PI = 0%, 0 = 100%
 
         # combine angle and distance differences to total accuracy
         self.check_results = self.accuracy_weight_direction * diff_direction + self.accuracy_weight_distance * diff_distance
@@ -417,8 +416,8 @@ class ConvolutionalNetwork:
         # allow saving results to file
         summary_writer = tf.train.SummaryWriter(os.path.join(self.log_dir, "tf-summary"), self.session.graph)
 
-        interrupt_every_x_steps = min(self.iterations / 2.5, 1000)
-        interrupt_every_x_steps_late = self.iterations / 2;
+        interrupt_every_x_steps = min(self.iterations / 2.5, 1000, 1) #TODO remove ", 10" on computer with higher performance
+        interrupt_every_x_steps_late = 1; #TODO set back to: self.iterations / 2
         for step in range(self.iterations):
 
             # get a batch of training samples
@@ -436,7 +435,7 @@ class ConvolutionalNetwork:
                                      feed_dict)
 
             # write the summaries and print an overview quite often
-            if True or  step % 100 == 0 or (step + 1) == self.iterations: #TODO remove "True or"
+            if True or step % 100 == 0 or (step + 1) == self.iterations: #TODO remove "True or"
                 # Print status
                 log.log('Iteration {0}/{1}: loss = {2:.2f}, learning rate = {3:.4f}'.format(step + 1, self.iterations, loss_value, self.session.run(self.learning_rate)))
                 # Update the events file.
@@ -456,17 +455,17 @@ class ConvolutionalNetwork:
                     log.log("Updated accuracies after {}/{} iterations:".format((step + 1), self.iterations))
 
                     # 1/3: validation data
-                    acc_val = self.accuracy(self.Xval, self.Yval)
+                    acc_val = self.accuracy(self.XvalPrevious, self.XvalCurrent, self.Yval)
                     log.log(" - validation: {0:.3f}%".format(acc_val * 100))
 
             if (step + 1) % interrupt_every_x_steps_late == 0 and (step + 1) != self.iterations: #don't print in last run as this will be done anyway
 
                 # 2/3: training data
-                acc_train = self.accuracy(self.Xtrain, self.Ytrain)
+                acc_train = self.accuracy(self.XtrainPrevious, self.XtrainCurrent, self.Ytrain)
                 log.log(" - training: {0:.3f}%".format(acc_train * 100))
 
                 # 3/3: test data
-                # acc_test = self.accuracy(self.Xtest, self.Ytest)
+                # acc_test = self.accuracy(self.XtestPrevious, self.XtestCurrent, self.Ytest)
                 # log.log(" - test: {0:.3f}%".format(acc_test * 100))
 
             # check timeout
@@ -487,20 +486,21 @@ class ConvolutionalNetwork:
 
         # TODO does this give the correct position?
         # TODO (not needed for accuracy, but for "real" tracking:) scale is still 0.5, so we need to multiply by 2
-        position_predicted_1D = tf.argmax(probs_1d, 1)
+        position_predicted_1D = tf.reshape(tf.argmax(probs_1d, 1),[self.batch_size, 1])
         row = position_predicted_1D / self.output_width  # needs to be floored
         column = position_predicted_1D % self.output_width
-        position_predicted_2D = np.concatenate([row,column],1)
+        position_predicted_2D = tf.concat(1,[row,column])
 
         return position_predicted_2D
 
-    def accuracy(self, x, y):
-        num_iter = int(math.ceil(x.shape[0] / self.batch_size))
+    def accuracy(self, x_prev, x_curr, y):
+        num_iter = int(math.ceil(x_prev.shape[0] / self.batch_size))
         true_count = 0  # sum up all single accuracies
         total_sample_count = num_iter * self.batch_size
         step = 0
         while step < num_iter:
-            feed_dict = {self.placeholder_images: x[step * self.batch_size: (step + 1) * self.batch_size],
+            feed_dict = {self.x_previous: x_prev[step * self.batch_size: (step + 1) * self.batch_size],
+                         self.x_current: x_curr[step * self.batch_size: (step + 1) * self.batch_size],
                          self.placeholder_labels: y[step * self.batch_size: (step + 1) * self.batch_size],
                          self.dropout_prob: 1.0} #deactivate dropout for testing
             predictions = self.session.run(self.check_results, feed_dict)
@@ -508,7 +508,10 @@ class ConvolutionalNetwork:
             step += 1
 
         # Compute precision @ 1.
-        precision = true_count / total_sample_count
+        precision = true_count
+        if total_sample_count > 0:
+            precision /= total_sample_count
+
         return precision
 
 
@@ -524,33 +527,65 @@ class ConvolutionalNetwork:
     def mergeChannels(self,inputs):
         return tf.concat(3, inputs)
 
-    # TODO replace by native methods. only used for a
-    def dot(self, vA, vB):
-        return vA[0] * vB[0] + vA[1] * vB[1]
-
     # source: http://stackoverflow.com/questions/28260962/calculating-angles-between-line-segments-python-with-math-atan2
     # returns angle between the two lines in range of 0 to 180
-    def angle_between_movements(self, lineA, lineB):
-        # Get nicer vector form
-        vA = [(lineA[0][0] - lineA[1][0]), (lineA[0][1] - lineA[1][1])]
-        vB = [(lineB[0][0] - lineB[1][0]), (lineB[0][1] - lineB[1][1])]
+    def angle_between_movements(self, vA, vB, magA, magB):
+
+        # Get nicer vector form / THIS STEP IS ALREADY DONE BEFORE
+        #vA = [(lineA[0][0] - lineA[1][0]), (lineA[0][1] - lineA[1][1])]
+        #vB = [(lineB[0][0] - lineB[1][0]), (lineB[0][1] - lineB[1][1])]
+
         # Get dot prod
-        dot_prod = self.dot(vA, vB)
-        # Get magnitudes
-        magA = self.dot(vA, vA) ** 0.5
-        magB = self.dot(vB, vB) ** 0.5
+        dot_prod = vA * vB
+        dot_prod = tf.reduce_sum(dot_prod, 1, True)
+        dot_prod = tf.to_float(dot_prod)
+
+        # Get magnitudes (already precalculated, so we take those)
+        #magA = self.dot(vA, vA) ** 0.5
+        #magB = self.dot(vB, vB) ** 0.5
+
         # Get cosine value
-        cos_ = dot_prod / magA / magB
-        # Get angle in radians and then convert to degrees
-        angle = math.acos(dot_prod / magB / magA)
-        # Basically doing angle <- angle mod 360
-        ang_deg = math.degrees(angle) % 360
+        cos = tf.truediv(tf.truediv(dot_prod, magA), magB) #dot_prod / magA / magB
 
-        if ang_deg - 180 >= 0:
-            # As in if statement
-            return 360 - ang_deg
-        else:
+        # Get angle in radians
+        angle = self.tf_arccos(cos)
 
-            return ang_deg
+        return angle
 
+
+    # calculate the element-wise arcuscosinus.
+    # return value is between 0 and PI
+    # Tensorflow doesn't provide this feature yet, but will, see:
+    # https: // github.com / tensorflow / tensorflow / issues / 1108
+    # TODO use correct implementation instead of approximation
+    def tf_arccos(self, tensor):
+
+        # theoretically, we should be able to use numpy for this..
+        # but it's not working..
+        #angle = np.arccos(cos) #this complains that a Tensor doesn't got an attribute called arccos
+        #angle = np.arccos(cos.eval()) #this should convert Tensor to np before, but doesn't work either
+
+        # use simple approximation with max error of 10 degrees
+        # source: http://stackoverflow.com/questions/3380628/fast-arc-cos-algorithm
+        angle = (-0.69813170079773212 * tensor * tensor - 0.87266462599716477) * tensor + 1.5707963267948966;
+
+        return angle
+
+    '''
+    Calculates "a norm" for a batch of tensors.
+    So tensor's shape must be [self.batch_size, x, y]
+    Returning value will have shape [self.batch_size, 1]
+    and each entry got the value sqrt(x*x + y*y)
+    '''
+    def tf_norm_batch(self, tensor):
+
+        result = tf.square(tensor)
+        result = tf.reduce_sum(result, 1, True)
+
+        # TODO we might skip the sqrt, as the "real scale" doesn't matter to us for camparing distance ratios,
+        # but we need to ensure that angle_between_movements is working correctly, too
+        result = tf.to_float(result) #everything before might have been integer only
+        result = tf.sqrt(result)
+
+        return result
 

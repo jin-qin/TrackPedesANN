@@ -9,7 +9,7 @@ import gc
 
 #cf = config
 #cfc = user config constant => do not change manually
-cf_max_samples = 10000 # maximum number of loaded training samples. 0=unlimited
+cf_max_samples = 1000 # maximum number of loaded training samples. 0=unlimited
 cfc_cache_dataset_hdd = True # reminder: if this is turned on, and you want to change other settings, they might need a cache reset => clear folder
 cf_validation_set_size = 10 #TODO increase! right now we're not yet using the validation data set, that's why it's so tiny # this absolute number of images will be taken from the training images and used as validation data
 cf_dataset = 0 # 0 => Caltech
@@ -20,7 +20,7 @@ cf_log_auto_save = True #if True, the log file will be saved automatically as so
 cf_log_dir = cf_log_dir_init = "logs"
 cf_batch_size = 100 #must divide number of images in all used datasets
 cf_learning_rate = 0.9
-cf_num_iters = 1000 #30.000 46 45 45
+cf_num_iters = 1000
 cf_regularization_strength = 0 #0 means no regularization L2
 cf_learning_rate_decay = 0.95 #1 means no decay
 cf_dropout_rate = 0.5 # 1.0 = no dropout
@@ -170,7 +170,6 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
         Yval = Yall[val_ids]
 
         #del Xall
-        del Yall
         gc.collect()
 
 

@@ -45,11 +45,11 @@ if cf_dataset == 0:
 def redo_finalize(saveLog):
 
     global XTrainPrevious, XTrainCurrent, Ytrain, XvalPrevious, XvalCurrent, Yval,\
-        cfc_dataset_name, net, cfc_cache_dataset_hdd, cf_min_max_scaling, cf_standardization, cf_max_samples
+        cfc_dataset_name, net, cfc_cache_dataset_hdd, cf_min_max_scaling, cf_standardization, cf_max_samples, cf_validation_set_size
 
     # if not already done, load test data
     if (cf_dataset != 0):
-        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling, cf_standardization, cf_head_rel_pos_prev_row, cf_head_rel_pos_prev_col)
+        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling, cf_standardization, cf_head_rel_pos_prev_row, cf_head_rel_pos_prev_col, cf_validation_set_size)
         XtestPrev, XtestCurr, Ytest = calLoader.getTestData()
 
         log.log('Loaded testset, which includes {} images.'.format(XtestPrev.shape[0]))
@@ -156,20 +156,10 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
 
     log.log('Loading ' + cfc_dataset_name + ' dataset..')
     if(cf_dataset == 0):
-        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling, cf_standardization, cf_head_rel_pos_prev_row, cf_head_rel_pos_prev_col)
+        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling, cf_standardization, cf_head_rel_pos_prev_row, cf_head_rel_pos_prev_col, cf_validation_set_size)
         XTrainPrevious, XTrainCurrent, Yall = calLoader.getTrainingData()
 
-        # resample training data to gain validation dataset
-        # TODO set correct ratio and maybe move to CaltechLoader
-        log.log(".. resampling training and validation data")
-        indices = np.random.permutation(XTrainPrevious.shape[0])
-        trainingset_size = XTrainPrevious.shape[0] - cf_validation_set_size
-        train_ids, val_ids = indices[:trainingset_size], indices[trainingset_size:] #kepp in mind: fix params when changing dataset size
-        XTrainPrevious, XTrainCurrent, XvalPrevious, XvalCurrent = XTrainPrevious[train_ids, :], XTrainCurrent[train_ids, :], XTrainPrevious[val_ids, :], XTrainCurrent[val_ids, :]
-        Ytrain = Yall[train_ids]
-        Yval = Yall[val_ids]
 
-        #del Xall
         gc.collect()
 
 

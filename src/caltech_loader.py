@@ -10,7 +10,18 @@ import preprocessor
 
 class CaltechLoader:
 
-    def __init__(self, root_dir, cache, maxSamples=5000, min_max_scaling=True, standardization=True, head_rel_pos_prev_row=0.25, head_rel_pos_prev_col=0.5):
+    def __init__(self, root_dir, cache, maxSamples=5000, min_max_scaling=True, standardization=True, head_rel_pos_prev_row=0.25, head_rel_pos_prev_col=0.5, validation_set_size=1000):
+
+        self.trainingSamplesPrevious = None
+        self.trainingSamplesCurrent = None
+        self.trainingY = None
+        self.validationSamplesPrevious = None
+        self.validationSamplesCurrent = None
+        self.validationY = None
+        self.testSamplesPrevious = None
+        self.testSamplesCurrent = None
+        self.testY = None
+
 
         self.image_width = 48
         self.image_height = 128
@@ -23,9 +34,10 @@ class CaltechLoader:
         self.maxSamples = maxSamples
         self.head_rel_pos_prev_row = head_rel_pos_prev_row
         self.head_rel_pos_prev_col = head_rel_pos_prev_col
+        self.validation_set_size = validation_set_size
 
 
-    def loadDataSet(self,training):
+    def loadDataSet(self, training):
 
         if training:
             name = "caltech-training.p"
@@ -196,12 +208,26 @@ class CaltechLoader:
         self.trainingSamplesCurrent = np.swapaxes(self.trainingSamplesCurrent, 1, 2)
         self.trainingY = np.asarray(self.trainingY, np.float16)
 
+        # resample training data to gain validation dataset
+        # (needs to be done before preprocessing. otherwise validation data will be used for the calculations)
+        if training:
+            log.log(".. resampling training and validation data")
+            indices = np.random.permutation(self.trainingSamplesPrevious.shape[0])
+            trainingset_size = self.trainingSamplesPrevious.shape[0] - self.validation_set_size
+            train_ids, val_ids = indices[:trainingset_size], indices[trainingset_size:]  # keep in mind: fix params when changing dataset size
+            self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.validationSamplesPrevious, self.validationSamplesCurrent = self.trainingSamplesPrevious[train_ids, :], self.trainingSamplesCurrent[train_ids,:],\
+                                                                       self.trainingSamplesPrevious[val_ids,:], self.trainingSamplesCurrent[val_ids, :]
+            self.trainingY, Yval = self.trainingY[train_ids], self.trainingY[val_ids]
+
         # preprocessing
         pre = preprocessor.Preprocessor(self.trainingSamplesPrevious, self.min_max_scaling, self.standardization )
         pre.preprocessData([self.trainingSamplesPrevious, self.trainingSamplesCurrent])
-        # TODO split up between training and validation data needs to be done before. otherwise validation data will be used for the calculations
-        #TODO preprocess validation data (and test data): self.XvalPrevious, self.XvalCurrent
+
+        #TODO preprocess test data
         # TODO whenever calling other instances (like live camera images in an application) they need to be preprocessed, too
+
+        if training:
+            pre.preprocessData([self.validationSamplesPrevious, self.validationSamplesCurrent])
 
 
         if training:
@@ -345,13 +371,21 @@ class CaltechLoader:
 
     def getTrainingData(self):
 
-        # TODO call only once
-        self.loadDataSet(True)
+        # call only once
+        if self.trainingSamplesPrevious == None:
+            self.loadDataSet(True)
 
-        # get training data
-        XPrevious, XCurrent, Y = self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.trainingY
+        return self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.trainingY
 
-        return XPrevious, XCurrent, Y
+
+    def getTrainingData(self):
+
+        # call only once
+        if self.trainingSamplesPrevious == None: #validation data will be loaded together with validation data
+            self.loadDataSet(True)
+
+        return self.validationSamplesPrevious, self.validationSamplesCurrent, self.validationY
+
 
     def calcTargetProbMap(self, center_x, center_y):
 
@@ -372,12 +406,11 @@ class CaltechLoader:
 
     def getTestData(self):
 
-        # TODO call only once
-        self.loadDataSet(False)
+        # call only once
+        if self.testSamplesPrevious == None:
+            self.loadDataSet(False)
 
-        # TODO get test data
-        XPrevious, XCurrent,Y = self.testSamplesPrevious, self.testSamplesCurrent, self.testY
-        return XPrevious, XCurrent , Y
+        return self.testSamplesPrevious, self.testSamplesCurrent, self.testY
 
     def softmax(self, allScores):
 

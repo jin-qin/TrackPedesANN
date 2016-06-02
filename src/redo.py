@@ -42,25 +42,25 @@ if cf_dataset == 0:
 #    cfc_dataset_name = 'CIFAR-100'
 
 
-def redo_finalize(Xtrain, Ytrain, Xval, Yval, saveLog):
+def redo_finalize(saveLog):
 
-    global cfc_dataset_name, net, cfc_cache_dataset_hdd, cf_min_max_scaling, cf_standardization, cf_max_samples
+    global XTrainPrevious, XTrainCurrent, Ytrain, XvalPrevious, XvalCurrent, Yval,\
+        cfc_dataset_name, net, cfc_cache_dataset_hdd, cf_min_max_scaling, cf_standardization, cf_max_samples
 
     # if not already done, load test data
     if (cf_dataset != 0):
         calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling, cf_standardization, cf_head_rel_pos_prev_row, cf_head_rel_pos_prev_col)
-        Xtest, Ytest = calLoader.getTestData()
+        XtestPrev, XtestCurr, Ytest = calLoader.getTestData()
 
-        log.log('Loaded testset, which includes {} images.'.format(Xtest.shape[0]))
-        net.preprocessData(Xtest)
+        log.log('Loaded testset, which includes {} images.'.format(XtestPrev.shape[0]))
 
-    val_acc = net.accuracy(Xval, Yval)
+    val_acc = net.accuracy(XvalPrevious, XvalCurrent, Yval)
     log.log('FINAL Accuracy validation {0:.3f}%'.format(val_acc * 100))
 
-    test_acc = net.accuracy(Xtest, Ytest)
+    test_acc = net.accuracy(XtestPrev, XtestCurr, Ytest)
     log.log('FINAL Accuracy test {0:.3f}%'.format(test_acc * 100))
 
-    train_acc = net.accuracy(Xtrain, Ytrain)
+    train_acc = net.accuracy(XTrainPrevious, XTrainCurrent, Ytrain)
     log.log('FINAL Accuracy training {0:.3f}%'.format(train_acc * 100))
 
     net.closeSession()
@@ -220,12 +220,12 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
         finalizeAndSave = input("Do you want to save the latest data? [y/n]")
         if finalizeAndSave != "n":
             log.log("Saving latest results.")
-            redo_finalize(Xtrain, Ytrain, Xval, Yval, True)
+            redo_finalize(True)
             sys.exit()
         else:
             log.log("Results deleted.")
 
-    redo_finalize(Xtrain, Ytrain, Xval, Yval, cf_log_auto_save)
+    redo_finalize(cf_log_auto_save)
 
     #except Exception as e:  #TODO
     #    log.log("crash detected. auto repairing.. redo.. " + e.message)

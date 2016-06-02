@@ -35,6 +35,10 @@ cfc_datasetpath_init = "/media/th/6C4C-2ECD/ml_datasets" # path to the (Caltech)
 cf_head_rel_pos_prev_row = 0.25 # 0=top, 1=bottom #TODO verify that the upper and not the lower quarter is used
 cf_head_rel_pos_prev_col = 0.5 # 0=left hand side, 1=right hand side, 0.5 = horizontale center
 
+# extracted image patches will be resized to 48x128px,
+# but we will only resize images with at least one dimension having a minimum of:
+cf_image_size_min_resize = 48 * 1.25
+
 
 ###############################################################
 ### STATIC CONFIG - Please don't change anything ##############
@@ -179,7 +183,9 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
     # load data
     log.log('Loading ' + cfc_dataset_name + ' dataset..')
     if(cf_dataset == 0):
-        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling, cf_standardization, cf_head_rel_pos_prev_row, cf_head_rel_pos_prev_col, cf_validation_set_size)
+        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling,
+                                     cf_standardization, cf_head_rel_pos_prev_row, cf_head_rel_pos_prev_col,
+                                     cf_validation_set_size, cf_image_size_min_resize)
         XTrainPrevious, XTrainCurrent, Ytrain = calLoader.getTrainingData()
         XvalPrevious, XvalCurrent, Yval = calLoader.getValidationData()
 

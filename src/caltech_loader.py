@@ -10,7 +10,8 @@ import preprocessor as pp
 
 class CaltechLoader:
 
-    def __init__(self, root_dir, cache, maxSamples=5000, min_max_scaling=True, standardization=True, head_rel_pos_prev_row=0.25, head_rel_pos_prev_col=0.5, validation_set_size=1000):
+    def __init__(self, root_dir, cache, maxSamples=5000, min_max_scaling=True, standardization=True,
+                 head_rel_pos_prev_row=0.25, head_rel_pos_prev_col=0.5, validation_set_size=1000, image_size_min_resize=48):
 
         self.trainingSamplesPrevious = None
         self.trainingSamplesCurrent = None
@@ -25,7 +26,7 @@ class CaltechLoader:
 
         self.image_width = 48
         self.image_height = 128
-        self.image_size_min_resize = self.image_width * 1.25 #/ 2 # minimum length of minimum-length image length to allow resizing
+        self.image_size_min_resize = image_size_min_resize
         self.input_dir = os.path.join(root_dir, "caltech")
         self.output_dir = os.path.join(self.input_dir, "cached")
         self.cache = cache

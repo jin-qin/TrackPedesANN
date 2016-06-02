@@ -1,10 +1,21 @@
-import caltech_loader as cl
-import conv_net as cnn
-import log
-import numpy as np
-import sys
-import os
-import gc
+'''
+This network is based on the paper "Human Tracking using Convolutional Neural Networks" by J Fan - 2010
+
+Installation Requirements:
+- python 2 (python 3 not yet supported!)
+- opencv 2.4 (opencv 3 not yet supported!)
+- tensorflow (currently version 0.8)
+- numpy
+
+How to run:
+- Download the Caltech Dataset from http://www.vision.caltech.edu/Image_Datasets/CaltechPedestrians/
+- Extract the different sets into one common folder
+- Set the var cfc_datasetpath_init (see below) to fit that folder
+- If you don't got enough memory to extract or process all data at once, you need at least:
+    + annotations
+    + one extracted archive containing training data (set00 - set05)
+    + one extracted archive containing test data (set06 - set10)
+'''
 
 ###############################################################
 ############# CONFIGURATION to play around ####################
@@ -56,6 +67,19 @@ if cf_dataset == 0:
     cfc_dataset_name = 'Caltech'
 #else:
 #    cfc_dataset_name = 'CIFAR-100'
+
+
+###############################################################
+###################### Imports ################################
+###############################################################
+
+import caltech_loader as cl
+import conv_net as cnn
+import log
+import numpy as np
+import sys
+import os
+import gc
 
 
 ###############################################################

@@ -157,8 +157,8 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
     log.log('Loading ' + cfc_dataset_name + ' dataset..')
     if(cf_dataset == 0):
         calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling, cf_standardization, cf_head_rel_pos_prev_row, cf_head_rel_pos_prev_col, cf_validation_set_size)
-        XTrainPrevious, XTrainCurrent, Yall = calLoader.getTrainingData()
-
+        XTrainPrevious, XTrainCurrent, Ytrain = calLoader.getTrainingData()
+        XvalPrevious, XvalCurrent, Yval = calLoader.getValidationData()
 
         gc.collect()
 

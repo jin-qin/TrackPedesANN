@@ -6,7 +6,7 @@ from collections import defaultdict
 import numpy as np
 import cPickle as pickle
 import log
-import preprocessor
+import preprocessor as pp
 
 class CaltechLoader:
 
@@ -55,6 +55,7 @@ class CaltechLoader:
 
             if training:
                 self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.trainingY = pickle.load(open(cache_file, "rb"))
+                self.validationSamplesPrevious, self.validationSamplesCurrent, self.validationY = pickle.load(open(os.path.join(self.output_dir, "caltech-validation.p"), "rb"))
             else:
                 self.testSamplesPrevious, self.testSamplesCurrent, self.testY = pickle.load(open(cache_file, "rb"))
 
@@ -139,14 +140,18 @@ class CaltechLoader:
         image_folders_only = []
         for dname in imagesets:
             if os.path.isdir(dname):
-                image_folders_only.append(dname)
+                set_name = os.path.basename(dname)
+
+                if training and self.is_training_set_part(set_name) or ((not training) and self.is_test_set_part(set_name)):
+                    image_folders_only.append(dname)
+
 
         log.log("{} extracted image sets found".format(len(image_folders_only)))
         skipped = len(imagesets) - len(image_folders_only)
         if skipped > 0:
             log.log("{} further files skipped. Forgot to extract?".format(skipped))
 
-        self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.trainingY = [], [], []
+        x_prev, x_curr, y = [], [], []
 
         for dname in image_folders_only:
             set_name = os.path.basename(dname)
@@ -167,7 +172,7 @@ class CaltechLoader:
                         break
 
                     if i > 0:
-                        self.extractPedestriansFromImage(previousFrame, frame, set_name, video_name, i)
+                        self.extractPedestriansFromImage(previousFrame, frame, set_name, video_name, i, x_prev, x_curr, y)
 
                     # TODO save original raw image on disk?
                     #self.save_img(dname, fn, i, frame)
@@ -177,10 +182,10 @@ class CaltechLoader:
 
 
                 # after all frames of this video have been preprocessed, we can start creating pairs
-                log.log("Number of created training pairs: {}".format(len(self.trainingSamplesPrevious)))
+                log.log("Number of created training pairs: {}".format(len(x_prev)))
 
                 # allow only max self.maxSamples pairs for speed up (during development)
-                if self.maxSamples > 0 and len(self.trainingSamplesPrevious) > self.maxSamples:
+                if self.maxSamples > 0 and len(x_prev) > self.maxSamples:
                     log.log("FORCE STOP");
                     break
 
@@ -193,61 +198,77 @@ class CaltechLoader:
 
 
         # add gradient channels
-        for i in range(len(self.trainingSamplesCurrent)): #indexes 0-4: previous image. 5-9:current image
-            self.trainingSamplesPrevious[i] = self.wrapImage(self.trainingSamplesPrevious[i])
-            self.trainingSamplesCurrent[i] = self.wrapImage(self.trainingSamplesCurrent[i])
+        for i in range(len(x_curr)): #indexes 0-4: previous image. 5-9:current image
+            x_prev[i] = self.wrapImage(x_prev[i])
+            x_curr[i] = self.wrapImage(x_curr[i])
 
         log.log("Finished gradient calculations.")
 
         # convert to np
-        self.trainingSamplesPrevious = np.asarray(self.trainingSamplesPrevious, np.float16)
-        self.trainingSamplesPrevious = np.swapaxes(self.trainingSamplesPrevious, 1, 3)
-        self.trainingSamplesPrevious = np.swapaxes(self.trainingSamplesPrevious, 1, 2)
-        self.trainingSamplesCurrent = np.asarray(self.trainingSamplesCurrent, np.float16)
-        self.trainingSamplesCurrent = np.swapaxes(self.trainingSamplesCurrent, 1, 3)
-        self.trainingSamplesCurrent = np.swapaxes(self.trainingSamplesCurrent, 1, 2)
-        self.trainingY = np.asarray(self.trainingY, np.float16)
+        x_prev = np.asarray(x_prev, np.float16)
+        x_prev = np.swapaxes(x_prev, 1, 3)
+        x_prev = np.swapaxes(x_prev, 1, 2)
+        x_curr = np.asarray(x_curr, np.float16)
+        x_curr = np.swapaxes(x_curr, 1, 3)
+        x_curr = np.swapaxes(x_curr, 1, 2)
+        y = np.asarray(y, np.float16)
 
         # resample training data to gain validation dataset
         # (needs to be done before preprocessing. otherwise validation data will be used for the calculations)
         if training:
             log.log(".. resampling training and validation data")
-            indices = np.random.permutation(self.trainingSamplesPrevious.shape[0])
-            trainingset_size = self.trainingSamplesPrevious.shape[0] - self.validation_set_size
+            indices = np.random.permutation(x_prev.shape[0])
+            trainingset_size = x_prev.shape[0] - self.validation_set_size
             train_ids, val_ids = indices[:trainingset_size], indices[trainingset_size:]  # keep in mind: fix params when changing dataset size
-            self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.validationSamplesPrevious, self.validationSamplesCurrent = self.trainingSamplesPrevious[train_ids, :], self.trainingSamplesCurrent[train_ids,:],\
-                                                                       self.trainingSamplesPrevious[val_ids,:], self.trainingSamplesCurrent[val_ids, :]
-            self.trainingY, Yval = self.trainingY[train_ids], self.trainingY[val_ids]
+            x_prev, x_curr, self.validationSamplesPrevious, self.validationSamplesCurrent = x_prev[train_ids, :], x_curr[train_ids,:],\
+                                                                       x_prev[val_ids,:], x_curr[val_ids, :]
+            y, self.validationY = y[train_ids], y[val_ids]
 
-        # preprocessing
-        pre = preprocessor.Preprocessor(self.trainingSamplesPrevious, self.min_max_scaling, self.standardization )
-        pre.preprocessData([self.trainingSamplesPrevious, self.trainingSamplesCurrent])
+            # if we are loading training data, we need to initialize the preprocessor once and also preprocess validation data
+            self.preprocessor = pp.Preprocessor(x_prev, self.min_max_scaling, self.standardization)
+            self.preprocessor.preprocessData([self.validationSamplesPrevious, self.validationSamplesCurrent])
 
-        #TODO preprocess test data
+
+        # this is valid for training as well as for test data
+        self.preprocessor.preprocessData([x_prev, x_curr])
+
+
         # TODO whenever calling other instances (like live camera images in an application) they need to be preprocessed, too
 
-        if training:
-            pre.preprocessData([self.validationSamplesPrevious, self.validationSamplesCurrent])
 
-
+        # datasets are ready! rename and save..
         if training:
-            name = "caltech-training.p"
+
+            self.trainingSamplesPrevious = x_prev
+            self.trainingSamplesCurrent = x_curr
+            self.trainingY = y
+
+            # saving data to file
+            if self.cache:
+                name = "caltech-training.p"
+                log.log("saving training data to file")
+                pickle.dump([self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.trainingY],
+                            open(os.path.join(self.output_dir, name), "wb"))
+
+                name = "caltech-validation.p"
+                log.log("saving validation data to file")
+                pickle.dump([self.validationSamplesPrevious, self.validationSamplesCurrent, self.validationY],
+                            open(os.path.join(self.output_dir, name), "wb"))
+
         else:
-            name = "caltech-test.p"
+            self.testSamplesPrevious = x_prev
+            self.testSamplesCurrent = x_curr
+            self.testY = y
 
-        # saving data to file
-        if self.cache:
-            log.log("saving data to file")
-            pickle.dump([self.trainingSamplesPrevious,self.trainingSamplesCurrent, self.trainingY], open(os.path.join(self.output_dir, name), "wb"))
+            # saving data to file
+            if self.cache:
+                name = "caltech-test.p"
+                log.log("saving test data to file")
+                pickle.dump([self.testSamplesPrevious, self.testSamplesCurrent, self.testY],
+                            open(os.path.join(self.output_dir, name), "wb"))
 
-        # TODO find better solution for test data fix
-        if not training:
-            self.testSamplesPrevious = self.trainingSamplesPrevious
-            self.testSamplesCurrent = self.trainingSamplesCurrent
-            self.testY = self.trainingY
-            self.trainingSamplesPrevious = None
-            self.trainingSamplesCurrent = None
-            self.trainingY = None
+
+
 
 
     def split_into_rgb_channels(self, image):
@@ -278,7 +299,7 @@ class CaltechLoader:
             os.path.basename(fn).split('.')[0], i), frame)
 
 
-    def extractPedestriansFromImage(self, img_prev, img_curr, set_name, video_name, frame_i):
+    def extractPedestriansFromImage(self, img_prev, img_curr, set_name, video_name, frame_i, x_prevArr, x_currArr, y_labels):
 
         # keep in mind: when saving and loading json file before, we might need frame_i = str(frame_i)
         try:
@@ -335,8 +356,8 @@ class CaltechLoader:
                             if type(resized_image) != np.ndarray:
                                 log.log("Hugh?")
 
-                            self.trainingSamplesPrevious.append(resized_image_prev)
-                            self.trainingSamplesCurrent.append(resized_image)
+                            x_prevArr.append(resized_image_prev)
+                            x_currArr.append(resized_image)
 
                             # potential head position is supposed to be in the center of the current frame
                             # but as we choose the image patch based on the previous and not the current frame,
@@ -360,7 +381,7 @@ class CaltechLoader:
                             relative_center_y = round(relative_center_y)
 
                             probs = self.calcTargetProbMap(relative_center_x, relative_center_y)
-                            self.trainingY.append( probs )
+                            y_labels.append( probs )
 
                             #self.save_img(set_name, video_name, frame_i, img_ped)
 
@@ -372,16 +393,16 @@ class CaltechLoader:
     def getTrainingData(self):
 
         # call only once
-        if self.trainingSamplesPrevious == None:
+        if self.trainingSamplesPrevious is None:
             self.loadDataSet(True)
 
         return self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.trainingY
 
 
-    def getTrainingData(self):
+    def getValidationData(self):
 
         # call only once
-        if self.trainingSamplesPrevious == None: #validation data will be loaded together with validation data
+        if self.trainingSamplesPrevious is None: #validation data will be loaded together with validation data
             self.loadDataSet(True)
 
         return self.validationSamplesPrevious, self.validationSamplesCurrent, self.validationY
@@ -407,7 +428,7 @@ class CaltechLoader:
     def getTestData(self):
 
         # call only once
-        if self.testSamplesPrevious == None:
+        if self.testSamplesPrevious is None:
             self.loadDataSet(False)
 
         return self.testSamplesPrevious, self.testSamplesCurrent, self.testY
@@ -424,3 +445,15 @@ class CaltechLoader:
         # keep in mind that allScores[i] contains 10 scores for one image
         # so we need to divide each element by the sum of its row-sum, not by the whole sum
         return e / e.sum(axis=1, keepdims=True)
+
+
+    # returns true, if folder_name is the name of a folder containing TRAINING data
+    def is_training_set_part(self, folder_name):
+        return folder_name == "set00" or folder_name == "set01" or folder_name == "set02" or folder_name == "set03" or folder_name == "set04" or folder_name == "set05"
+
+    # returns true, if folder_name is the name of a folder containing TEST data
+    def is_test_set_part(self, folder_name):
+        return folder_name == "set06" or folder_name == "set07" or folder_name == "set08" or folder_name == "set09" or folder_name == "set10"
+
+    def is_caltech_dataset_folder(self, folder_name):
+        return self.is_training_set_part(folder_name) or self.is_test_set_part(folder_name)

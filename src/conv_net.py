@@ -21,7 +21,6 @@ class ConvolutionalNetwork:
                  accuracy_weight_direction=0.8,
                  accuracy_weight_distance=0.2):
 
-        log.log('Creating network..')
 
         # save given params
         self.XtrainPrevious = XtrainPrevious
@@ -47,24 +46,7 @@ class ConvolutionalNetwork:
         self.accuracy_weight_distance = accuracy_weight_distance
         self.accuracy_weight_direction = accuracy_weight_direction
 
-        # derive further params
-
-        # the (supposed) position of a pedestrian's head will always be the same for all PREVIOUS frames
-        # => once copy same value for one batch size, so we can use this during training
-        self.position_previous_2D_batch = np.zeros([self.batch_size, 2])
-        for x in self.position_previous_2D_batch:
-            x[0] = self.output_height * self.head_rel_pos_prev_row
-            x[1] = self.output_width * self.head_rel_pos_prev_col
-
-        # use original image shape, but resize the number of images to a single batch
-        self.size_input = []
-        orig_img_shape = tf.TensorShape(self.XtrainPrevious.shape).as_list()
-        for i in range(len(orig_img_shape)):
-            if i > 0:
-                self.size_input.append(orig_img_shape[i])
-            else:
-                self.size_input.append(self.batch_size)
-
+        log.log('Creating network..')
         log.log('.. Input dimension: {}.'.format(self.size_input))
         log.log('.. drop out between S2 and C3 active: {}'.format(self.dropout_rate > 0 and self.dropout_rate < 1))
         if self.dropout_rate > 0 and self.dropout_rate < 1:
@@ -130,7 +112,7 @@ class ConvolutionalNetwork:
             if (step + 1) % interrupt_every_x_steps == 0 or (step + 1) == self.iterations:
 
                 log.log("Saving checkpoint..")
-                saver.save(self.session, os.path.join(self.log_dir, "tf-checkpoint"), global_step=step)
+                self.saver.save(self.session, os.path.join(self.log_dir, "tf-checkpoint"), global_step=step)
 
                 # don't print in last run as this will be done anyway
                 if (step + 1) != self.iterations:
@@ -224,7 +206,7 @@ class ConvolutionalNetwork:
 
         ##### GLOBAL BRANCH Begin #####
         c2size = 33
-        C2, S2 = [], []
+        S2 = []
         for i in range(c2size):
             with tf.name_scope("C2_part{}".format(i + 1)):
 
@@ -306,8 +288,7 @@ class ConvolutionalNetwork:
 
                 # build actual (part of) convolutional layer
                 # TODO no activation function ?? e.g.: h_conv = tf.nn.relu(h_conv)
-                h_conv = self.conv2d(c2_input, W_conv2) + b_conv2
-                C2.append(h_conv)
+                h_conv = self.conv2d(c2_input, W_conv2) + b_conv2 #C2
 
                 # Layer S2 is a pooling layer with 33 feature maps using max operation
                 # each of this feature maps is only connected to exactly one particular
@@ -318,7 +299,6 @@ class ConvolutionalNetwork:
                 with tf.name_scope("S2_part{}".format(i + 1)):
                     S2.append(self.max_pool_2x2(h_conv))
 
-        C2 = np.asarray(C2)
         S2 = np.asarray(S2)
 
         ##
@@ -440,7 +420,7 @@ class ConvolutionalNetwork:
         self.summary_op = tf.merge_all_summaries()
 
         # create saver to be able saving current parameters at certain checkpoints
-        saver = tf.train.Saver()
+        self.saver = tf.train.Saver()
 
         # start a session
         self.session = tf.InteractiveSession()
@@ -448,6 +428,22 @@ class ConvolutionalNetwork:
         # initialize all vars
         init = tf.initialize_all_variables()
         self.session.run(init)
+
+        # the (supposed) position of a pedestrian's head will always be the same for all PREVIOUS frames
+        # => once copy same value for one batch size, so we can use this during training
+        self.position_previous_2D_batch = np.zeros([self.batch_size, 2])
+        for x in self.position_previous_2D_batch:
+            x[0] = self.output_height * self.head_rel_pos_prev_row
+            x[1] = self.output_width * self.head_rel_pos_prev_col
+
+        # use original image shape, but resize the number of images to a single batch
+        self.size_input = []
+        orig_img_shape = tf.TensorShape(self.XtrainPrevious.shape).as_list()
+        for i in range(len(orig_img_shape)):
+            if i > 0:
+                self.size_input.append(orig_img_shape[i])
+            else:
+                self.size_input.append(self.batch_size)
 
         ## accuracy Begin ###
         position_predicted_2D = self.get_target_position(self.scoresFlattened)
@@ -579,4 +575,3 @@ class ConvolutionalNetwork:
         result = tf.sqrt(result)
 
         return result
-

@@ -22,6 +22,7 @@ class CaltechLoader:
         self.testSamplesPrevious = None
         self.testSamplesCurrent = None
         self.testY = None
+        self.annotations = None
 
 
         self.image_width = 48
@@ -49,10 +50,17 @@ class CaltechLoader:
         cache_file = os.path.join(self.output_dir, name)
         if not self.cache or not os.path.exists(cache_file):
             log.log("No cached dataset has been found. Generate it once.")
-            self.loadAnnotations()
+
+            # load annotations, but only once
+            if self.annotations is None:
+                self.loadAnnotations()
+
             self.loadImages(training)
         else:
             log.log("Cached caltech dataset has been found. Start loading..")
+
+            log.log("restoring previous preprocessing data")
+            self.preprocessor = pickle.load(open(os.path.join(self.output_dir, "caltech-preprocessor.p"), "rb"))
 
             if training:
                 self.trainingSamplesPrevious, self.trainingSamplesCurrent, self.trainingY = pickle.load(open(cache_file, "rb"))
@@ -143,10 +151,10 @@ class CaltechLoader:
                     image_folders_only.append(dname)
 
 
-        log.log("{} extracted image sets found".format(len(image_folders_only)))
+        log.log("{} extracted image set(s) found".format(len(image_folders_only)))
         skipped = len(imagesets) - len(image_folders_only)
         if skipped > 0:
-            log.log("{} further files skipped. Forgot to extract?".format(skipped))
+            log.log("{} further file(s) skipped. Forgot to extract?".format(skipped))
 
         x_prev, x_curr, y = [], [], []
 
@@ -173,7 +181,7 @@ class CaltechLoader:
                         if i > 0:
                             self.extractPedestriansFromImage(previousFrame, frame, set_name, video_name, i, x_prev, x_curr, y)
 
-                        # TODO save original raw image on disk?
+                        # save original raw image on disk?
                         #self.save_img(dname, fn, i, frame)
 
                         previousFrame = frame
@@ -249,6 +257,11 @@ class CaltechLoader:
                     name = "caltech-validation.p"
                     log.log("saving validation data to file")
                     pickle.dump([self.validationSamplesPrevious, self.validationSamplesCurrent, self.validationY],
+                                open(os.path.join(self.output_dir, name), "wb"))
+
+                    name = "caltech-preprocessor.p"
+                    log.log("saving preprocessor data to file")
+                    pickle.dump([self.preprocessor],
                                 open(os.path.join(self.output_dir, name), "wb"))
 
             else:

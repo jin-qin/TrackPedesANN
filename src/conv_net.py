@@ -46,12 +46,24 @@ class ConvolutionalNetwork:
         self.accuracy_weight_distance = accuracy_weight_distance
         self.accuracy_weight_direction = accuracy_weight_direction
 
+        # get input dimension:
+        # use original image shape, but resize the number of images to a single batch
+        self.size_input = []
+        orig_img_shape = tf.TensorShape(self.XtrainPrevious.shape).as_list()
+        for i in range(len(orig_img_shape)):
+            if i > 0:
+                self.size_input.append(orig_img_shape[i])
+            else:
+                self.size_input.append(self.batch_size)
+
+        # some output
         log.log('Creating network..')
         log.log('.. Input dimension: {}.'.format(self.size_input))
         log.log('.. drop out between S2 and C3 active: {}'.format(self.dropout_rate > 0 and self.dropout_rate < 1))
         if self.dropout_rate > 0 and self.dropout_rate < 1:
             log.log('.. drop out rate: {}'.format(self.dropout_rate))
 
+        # begin with actual network creation
         self.setUpArchitecture()
 
 
@@ -429,6 +441,9 @@ class ConvolutionalNetwork:
         init = tf.initialize_all_variables()
         self.session.run(init)
 
+
+        ## accuracy Begin ###
+
         # the (supposed) position of a pedestrian's head will always be the same for all PREVIOUS frames
         # => once copy same value for one batch size, so we can use this during training
         self.position_previous_2D_batch = np.zeros([self.batch_size, 2])
@@ -436,16 +451,6 @@ class ConvolutionalNetwork:
             x[0] = self.output_height * self.head_rel_pos_prev_row
             x[1] = self.output_width * self.head_rel_pos_prev_col
 
-        # use original image shape, but resize the number of images to a single batch
-        self.size_input = []
-        orig_img_shape = tf.TensorShape(self.XtrainPrevious.shape).as_list()
-        for i in range(len(orig_img_shape)):
-            if i > 0:
-                self.size_input.append(orig_img_shape[i])
-            else:
-                self.size_input.append(self.batch_size)
-
-        ## accuracy Begin ###
         position_predicted_2D = self.get_target_position(self.scoresFlattened)
         position_real_2D = self.get_target_position(self.targetProbsFlattened)
         movement_real = self.position_previous_2D_batch - position_real_2D

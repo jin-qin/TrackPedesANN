@@ -22,8 +22,8 @@ How to run:
 ###############################################################
 
 # general
-cf_max_samples = 1000 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
-cf_num_iters = 1
+cf_max_samples = 0 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
+cf_num_iters = 1000
 cf_batch_size = 50
 cf_validation_set_size = round(cf_max_samples * 0.1) # this absolute number of images will be taken from the training images and used as validation data
 cf_min_max_scaling = True #turn on either this or cf_standardization

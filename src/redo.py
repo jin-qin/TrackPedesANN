@@ -22,9 +22,9 @@ How to run:
 ###############################################################
 
 # general
-cf_max_samples = 10000 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
-cf_num_iters = 10000
-cf_batch_size = 100
+cf_max_samples = 0 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
+cf_num_iters = 1000
+cf_batch_size = 50
 cf_validation_set_size = cf_max_samples * 0.1 # this absolute number of images will be taken from the training images and used as validation data
 cf_min_max_scaling = True #turn on either this or cf_standardization
 cf_standardization = True #turn on either this or cf_min_max_scaling
@@ -89,25 +89,32 @@ import gc
 # configurations to automatically evaluate hyperparameters:
 param_test_cf_learning_rate = [
     "cf_learning_rate",  # string name
-    [0.0001, 0.02, 0.03, 0.04, 0.05, 0.001, 0.01, 0.1, 0.15, 0.2]]  # values
-param_test_cf_number_of_filters_conv_both = [
-    "cf_number_of_filters_conv_both",  # string name
-    [8,16,32,64,128]]  # values
-param_test_cf_number_of_filters_conv1 = [
-    "cf_number_of_filters_conv1",  # string name
-    [8,16,32,64,128]]  # values
-param_test_cf_number_of_filters_conv2 = [
-    "cf_number_of_filters_conv2",  # string name
-    [8, 16, 32, 64,128]]  # values
-param_test_cf_number_of_conv_layers = [
-    "cf_number_of_conv_layers",  # string name
-    [2,1,3,4,5,6]]  # values
+    [0.001, 0.01, 0.1, 0.2,0.5,0.9,1,1.5]]  # values
+param_test_cf_batch_size = [
+    "cf_batch_size",  # string name
+    [50,100,150,200,250]]  # values
+param_test_cf_learning_rate_decay = [
+    "cf_learning_rate_decay",  # string name
+    [0.5, 0.7, 0.9, 0.95, 0.99, 1]]  # values
+param_test_cf_momentum = [
+    "cf_momentum",  # string name
+    [0, 0.25, 0.5, 0.72, 1]]  # values
 param_test_cf_dropout_rate = [
     "cf_dropout_rate",  # string name
     [0.25, 0.75,0.5,1.0]]  # values
 param_test_cf_optimizer = [
     "cf_optimizer",  # string name
     [1,0,2]]  # values
+param_test_cf_image_size_min_resize = [
+    "cf_image_size_min_resize",  # string name
+    [48 * 0.5, 48 * 0.75, 48, 48 * 1.2, 48 * 1.5, 48 * 2]]  # values
+param_test_cf_image_size_min_resize = [
+    "cf_min_max_scaling",  # TODO CLEAN CACHE AFTER EACH ITERATION (of this parameter)!!
+    [True, False]]  # values
+param_test_cf_standardization = [
+    "cf_standardization",  # TODO CLEAN CACHE AFTER EACH ITERATION (of this parameter)!!
+    [True, False]]  # values
+
 
 
 no_tests = ["", [0]]
@@ -182,19 +189,23 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
 
         if testvals[0] == "cf_learning_rate":
             cf_learning_rate = testvals[1][i]
-        elif testvals[0] == "cf_number_of_filters_conv_both":
-            cf_number_of_filters_conv1 = testvals[1][i]
-            cf_number_of_filters_conv2 = testvals[1][i]
-        elif testvals[0] == "cf_number_of_filters_conv1":
-            cf_number_of_filters_conv1 = testvals[1][i]
-        elif testvals[0] == "cf_number_of_filters_conv2":
-            cf_number_of_filters_conv2 = testvals[1][i]
-        elif testvals[0] == "cf_number_of_conv_layers":
-            cf_number_of_conv_layers = testvals[1][i]
+        elif testvals[0] == "cf_batch_size":
+            cf_batch_size = testvals[1][i]
+        elif testvals[0] == "cf_learning_rate_decay":
+            cf_learning_rate_decay = testvals[1][i]
+        elif testvals[0] == "cf_momentum":
+            cf_momentum = testvals[1][i]
+            cf_optimizer = 2
+        elif testvals[0] == "cf_image_size_min_resize":
+            cf_image_size_min_resize = testvals[1][i]
         elif testvals[0] == "cf_dropout_rate":
             cf_dropout_rate = testvals[1][i]
         elif testvals[0] == "cf_optimizer":
             cf_optimizer = testvals[1][i]
+        elif testvals[0] == "cf_min_max_scaling":
+            cf_min_max_scaling = testvals[1][i]
+        elif testvals[0] == "cf_standardization":
+            cf_standardization = testvals[1][i]
 
 
     if len(sys.argv) == 1:

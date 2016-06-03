@@ -29,6 +29,9 @@ class Preprocessor:
     # input data X will be changed as if preprocessData(X) has been called, so no further call for this object required
     def preprocessInit(self, min_max_scaling, standardization, Xorig):
 
+        log.log('.. apply standardization (mean + std): {}'.format(standardization))
+        log.log('.. min-max-scaling: {}'.format(min_max_scaling))
+
         X = Xorig.copy()
 
         # Min-Max scaling

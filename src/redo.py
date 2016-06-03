@@ -248,16 +248,12 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
 
     # Training
     log.log('Start Training..')
-    log.log('.. timeout after {} minutes'.format(cf_timeout_minutes))
-    log.log('.. learning rate: {}'.format(cf_learning_rate))
-    log.log('.. learning rate decay: {}'.format(cf_learning_rate_decay))
-    log.log('.. drop out between S2 and C3 active: {}'.format(cf_dropout_rate > 0 and cf_dropout_rate < 1))
-    if cf_dropout_rate > 0 and cf_dropout_rate < 1:
-        log.log('.. drop out rate: {}'.format(cf_dropout_rate))
+    if cf_timeout_minutes  > 0:
+        log.log('.. timeout after {} minutes'.format(cf_timeout_minutes))
     log.log('.. total number of iterations: {}'.format(cf_num_iters))
     log.log('.. batch size in each iteration: {}'.format(cf_batch_size))
-    log.log('.. apply standardization (mean + std): {}'.format(cf_standardization))
-    log.log('.. min-max-scaling: {}'.format(cf_min_max_scaling))
+    log.log('.. learning rate: {}'.format(cf_learning_rate))
+    log.log('.. learning rate decay: {}'.format(cf_learning_rate_decay))
     log.log('.. momentum update: {}'.format(cf_momentum))
 
 

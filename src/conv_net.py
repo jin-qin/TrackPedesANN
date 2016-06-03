@@ -66,7 +66,11 @@ class ConvolutionalNetwork:
                 self.size_input.append(self.batch_size)
 
         log.log('.. Input dimension: {}.'.format(self.size_input))
-        # log.log( '.. Standard deviation W-init: {}.'.format(cf_standard_deviation_w_init) )
+        log.log('.. drop out between S2 and C3 active: {}'.format(self.dropout_rate > 0 and self.dropout_rate < 1))
+        if self.dropout_rate > 0 and self.dropout_rate < 1:
+            log.log('.. drop out rate: {}'.format(self.dropout_rate))
+
+        self.setUpArchitecture()
 
 
 
@@ -91,9 +95,74 @@ class ConvolutionalNetwork:
         # runtime evaluation
         self.runtime_training_start = time.time()
 
+        # allow saving results to file
+        summary_writer = tf.train.SummaryWriter(os.path.join(self.log_dir, "tf-summary"), self.session.graph)
 
-        ## NEW TRACKING BEGIN ####################################################
+        interrupt_every_x_steps = min(self.iterations / 2.5, 1000, 10) #TODO remove ", 10" on computer with higher performance
+        interrupt_every_x_steps_late = max(self.iterations / 4, 1)
+        for step in range(self.iterations):
 
+            # get a batch of training samples
+            offset = (step * self.batch_size) % (self.Ytrain.shape[0] - self.batch_size)
+            batch_data_previous = self.XtrainPrevious[offset:(offset + self.batch_size), :]
+            batch_data_current = self.XtrainCurrent[offset:(offset + self.batch_size), :]
+            batch_labels = self.Ytrain[offset:(offset + self.batch_size)]
+
+            # finally start training with current batch
+            feed_dict ={self.x_previous:batch_data_previous,
+                        self.x_current: batch_data_current,
+                        self.placeholder_labels:batch_labels,
+                        self.dropout_prob: self.dropout_rate}
+            _, loss_value = self.session.run([self.train_op, self.loss],
+                                     feed_dict)
+
+            # write the summaries and print an overview quite often
+            if True or step % 100 == 0 or (step + 1) == self.iterations: #TODO remove "True or"
+                # Print status
+                log.log('Iteration {0}/{1}: loss = {2:.2f}, learning rate = {3:.4f}'.format(step + 1, self.iterations, loss_value, self.session.run(self.learning_rate)))
+                # Update the events file.
+                summary_str = self.session.run(self.summary_op, feed_dict=feed_dict)
+                summary_writer.add_summary(summary_str, step)
+                summary_writer.flush()
+
+            # print current accuracies less often (sometimes in between and at the end)
+            # + save checkpoint
+            if (step + 1) % interrupt_every_x_steps == 0 or (step + 1) == self.iterations:
+
+                log.log("Saving checkpoint..")
+                saver.save(self.session, os.path.join(self.log_dir, "tf-checkpoint"), global_step=step)
+
+                # don't print in last run as this will be done anyway
+                if (step + 1) != self.iterations:
+                    log.log("Updated accuracies after {}/{} iterations:".format((step + 1), self.iterations))
+
+                    # 1/3: validation data
+                    acc_val = self.accuracy(self.XvalPrevious, self.XvalCurrent, self.Yval)
+                    log.log(" - validation: {0:.3f}%".format(acc_val * 100))
+
+            if (step + 1) % interrupt_every_x_steps_late == 0 and (step + 1) != self.iterations: #don't print in last run as this will be done anyway
+
+                # 2/3: training data
+                acc_train = self.accuracy(self.XtrainPrevious, self.XtrainCurrent, self.Ytrain)
+                log.log(" - training: {0:.3f}%".format(acc_train * 100))
+
+                # 3/3: test data
+                # acc_test = self.accuracy(self.XtestPrevious, self.XtestCurrent, self.Ytest)
+                # log.log(" - test: {0:.3f}%".format(acc_test * 100))
+
+            # check timeout
+            if self.timeout_minutes > 0:
+                self.runtime_training_end = time.time() - self.runtime_training_start
+
+                if self.runtime_training_end > self.timeout_seconds:
+                    log.log("TIMEOUT: stopping earlier. saving current work.")
+                    break
+
+        # save final runtime one last time
+        # (intermediate updates might have already calculated this value, but only if timeout_minutes > 0)
+        self.runtime_training_end = time.time() - self.runtime_training_start
+
+    def setUpArchitecture(self):
 
         # input data: two batches of images. equal indices of the two batches must form valid pairs.
         # e.g. x_previous[i] and x_current[i] a one valid frame pair. Each image has the size = 48 x 128.
@@ -104,9 +173,9 @@ class ConvolutionalNetwork:
         #       => this is exactly what we need as the required input tensors need to be: [batch, in_height, in_width, in_channels]
         self.x_previous = tf.placeholder(tf.float32, shape=self.size_input, name="x_previous")
         self.x_current = tf.placeholder(tf.float32, shape=self.size_input, name="x_current")
-        self.placeholder_labels = tf.placeholder(tf.float32, shape=(self.size_input[0],self.output_height,self.output_width), name="y_pos_probs")
-
-
+        self.placeholder_labels = tf.placeholder(tf.float32,
+                                                 shape=(self.size_input[0], self.output_height, self.output_width),
+                                                 name="y_pos_probs")
 
         # Layer C1: convolutional layer with 10 feature maps
         # each feature map will be created independently
@@ -224,7 +293,8 @@ class ConvolutionalNetwork:
                 elif i == 31:
                     c2_input = self.mergeChannels([S1[0], S1[1], S1[4], S1[7], S1[8], S1[9]])
                 elif i == 32:
-                    c2_input = self.mergeChannels([S1[0], S1[1], S1[2], S1[3], S1[4], S1[5], S1[6], S1[7], S1[8], S1[9]])
+                    c2_input = self.mergeChannels(
+                        [S1[0], S1[1], S1[2], S1[3], S1[4], S1[5], S1[6], S1[7], S1[8], S1[9]])
 
                 self.conv2_filter_height = 7
                 self.conv2_filter_width = 3
@@ -250,8 +320,6 @@ class ConvolutionalNetwork:
 
         C2 = np.asarray(C2)
         S2 = np.asarray(S2)
-
-
 
         ##
 
@@ -312,7 +380,6 @@ class ConvolutionalNetwork:
             # TODO no activation function ?? e.g.: h_conv = tf.nn.relu(h_conv)
             C4 = self.conv2d(c4_input, W_conv4) + b_conv4
 
-
         # TODO the paper mentiones a translation transfrom at this point. Check out what this means and if we need
         W_conv4, b_conv4 = self.vars_W_b(
             [self.conv4_filter_width, self.conv4_filter_height, c4number_channels,
@@ -327,9 +394,9 @@ class ConvolutionalNetwork:
         C3 = tf.squeeze(C3)
         C4 = tf.squeeze(C4)
 
-        finalW1, finalB1 = self.vars_W_b([self.output_height, self.output_width]) #finalB1 will not be used
+        finalW1, finalB1 = self.vars_W_b([self.output_height, self.output_width])  # finalB1 will not be used
         finalW2, finalB2 = self.vars_W_b([self.output_height, self.output_width])
-        self.scores =  tf.sigmoid(tf.mul(C3, finalW1) + tf.mul(C4, finalW2) + finalB2)
+        self.scores = tf.sigmoid(tf.mul(C3, finalW1) + tf.mul(C4, finalW2) + finalB2)
 
         # loss function
         with tf.name_scope("loss"):
@@ -344,9 +411,8 @@ class ConvolutionalNetwork:
 
             cross_entropy = tf.nn.softmax_cross_entropy_with_logits(self.scoresFlattened,
                                                                     self.targetProbsFlattened,
-                                                                           name="xentropy")
-            loss = tf.reduce_mean(cross_entropy, name="xentropy_mean")
-
+                                                                    name="xentropy")
+            self.loss = tf.reduce_mean(cross_entropy, name="xentropy_mean")
 
         # Create a variable to track the global step (should be equal to the index var "step" in the following for loop)
         global_step = tf.Variable(0, name='global_step', trainable=False)
@@ -363,16 +429,15 @@ class ConvolutionalNetwork:
         else:
             optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
 
-
-        train_op = optimizer.minimize(loss, global_step=global_step)
+        self.train_op = optimizer.minimize(self.loss, global_step=global_step)
 
         # keep track of loss values
-        tf.scalar_summary(loss.op.name, loss)
+        tf.scalar_summary(self.loss.op.name, self.loss)
 
         # and maybe of the learning rate
         tf.scalar_summary(self.learning_rate.op.name, self.learning_rate)
 
-        summary_op = tf.merge_all_summaries()
+        self.summary_op = tf.merge_all_summaries()
 
         # create saver to be able saving current parameters at certain checkpoints
         saver = tf.train.Saver()
@@ -400,80 +465,12 @@ class ConvolutionalNetwork:
 
         # calculate difference in rad
         angle_rad = self.angle_between_movements(movement_real, movement_predicted, distance_real, distance_predicted)
-        diff_direction = 1 - (angle_rad / math.pi) #180 degrees = PI = 0%, 0 = 100%
+        diff_direction = 1 - (angle_rad / math.pi)  # 180 degrees = PI = 0%, 0 = 100%
 
         # combine angle and distance differences to total accuracy
         self.check_results = self.accuracy_weight_direction * diff_direction + self.accuracy_weight_distance * diff_distance
 
         ## accuracy End ###
-
-        # allow saving results to file
-        summary_writer = tf.train.SummaryWriter(os.path.join(self.log_dir, "tf-summary"), self.session.graph)
-
-        interrupt_every_x_steps = min(self.iterations / 2.5, 1000, 10) #TODO remove ", 10" on computer with higher performance
-        interrupt_every_x_steps_late = max(self.iterations / 4, 1)
-        for step in range(self.iterations):
-
-            # get a batch of training samples
-            offset = (step * self.batch_size) % (self.Ytrain.shape[0] - self.batch_size)
-            batch_data_previous = self.XtrainPrevious[offset:(offset + self.batch_size), :]
-            batch_data_current = self.XtrainCurrent[offset:(offset + self.batch_size), :]
-            batch_labels = self.Ytrain[offset:(offset + self.batch_size)]
-
-            # finally start training with current batch
-            feed_dict ={self.x_previous:batch_data_previous,
-                        self.x_current: batch_data_current,
-                        self.placeholder_labels:batch_labels,
-                        self.dropout_prob: self.dropout_rate}
-            _, loss_value = self.session.run([train_op, loss],
-                                     feed_dict)
-
-            # write the summaries and print an overview quite often
-            if True or step % 100 == 0 or (step + 1) == self.iterations: #TODO remove "True or"
-                # Print status
-                log.log('Iteration {0}/{1}: loss = {2:.2f}, learning rate = {3:.4f}'.format(step + 1, self.iterations, loss_value, self.session.run(self.learning_rate)))
-                # Update the events file.
-                summary_str = self.session.run(summary_op, feed_dict=feed_dict)
-                summary_writer.add_summary(summary_str, step)
-                summary_writer.flush()
-
-            # print current accuracies less often (sometimes in between and at the end)
-            # + save checkpoint
-            if (step + 1) % interrupt_every_x_steps == 0 or (step + 1) == self.iterations:
-
-                log.log("Saving checkpoint..")
-                saver.save(self.session, os.path.join(self.log_dir, "tf-checkpoint"), global_step=step)
-
-                # don't print in last run as this will be done anyway
-                if (step + 1) != self.iterations:
-                    log.log("Updated accuracies after {}/{} iterations:".format((step + 1), self.iterations))
-
-                    # 1/3: validation data
-                    acc_val = self.accuracy(self.XvalPrevious, self.XvalCurrent, self.Yval)
-                    log.log(" - validation: {0:.3f}%".format(acc_val * 100))
-
-            if (step + 1) % interrupt_every_x_steps_late == 0 and (step + 1) != self.iterations: #don't print in last run as this will be done anyway
-
-                # 2/3: training data
-                acc_train = self.accuracy(self.XtrainPrevious, self.XtrainCurrent, self.Ytrain)
-                log.log(" - training: {0:.3f}%".format(acc_train * 100))
-
-                # 3/3: test data
-                # acc_test = self.accuracy(self.XtestPrevious, self.XtestCurrent, self.Ytest)
-                # log.log(" - test: {0:.3f}%".format(acc_test * 100))
-
-            # check timeout
-            if self.timeout_minutes > 0:
-                self.runtime_training_end = time.time() - self.runtime_training_start
-
-                if self.runtime_training_end > self.timeout_seconds:
-                    log.log("TIMEOUT: stopping earlier. saving current work.")
-                    break
-
-        # save final runtime one last time
-        # (intermediate updates might have already calculated this value, but only if timeout_minutes > 0)
-        self.runtime_training_end = time.time() - self.runtime_training_start
-
 
 
     def get_target_position(self, probs_1d):

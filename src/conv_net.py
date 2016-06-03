@@ -451,10 +451,10 @@ class ConvolutionalNetwork:
             x[0] = self.output_height * self.head_rel_pos_prev_row
             x[1] = self.output_width * self.head_rel_pos_prev_col
 
-        position_predicted_2D = self.get_target_position(self.scoresFlattened)
+        self.position_predicted_2D = self.get_target_position(self.scoresFlattened)
         position_real_2D = self.get_target_position(self.targetProbsFlattened)
         movement_real = self.position_previous_2D_batch - position_real_2D
-        movement_predicted = self.position_previous_2D_batch - position_predicted_2D
+        movement_predicted = self.position_previous_2D_batch - self.position_predicted_2D
 
         # calculate difference in vector length (=distance of proposed movement)
         # (+ 0.0001 to prevent division by zero, which could occur in angle_between_movements() as well as calc of diff_distance)
@@ -580,3 +580,82 @@ class ConvolutionalNetwork:
         result = tf.sqrt(result)
 
         return result
+
+    # track one or multiple pedestrians in a (complete) video.
+    # => starting with a given initial position for each pedestrian, use that position to predict the position in the
+    # next frame. Use this position as a new init for the next frame. And so on..
+    # frames: array containing consecutive frames of one (or multiple) videos
+    # ped_pos_init: array containing all initial pedestrian positions. First dimension got exactly one element
+    # for each frame in frames. This element is another array containing the location of a single pedestrian in each
+    # of it's elements. TSo:
+    # ped_pos_init[frame_index][ped_index] = [x,y,width,height]
+    #   [x,y] are the supposed coordinates of the pedestrian's head. The head's relative position to a bounding box of
+    #   width x height pixels is determined by self.head_rel_pos_prev_row and self.head_rel_pos_prev_col.
+    def live_tracking_video(self, frames, ped_pos_init):
+
+        for frame_index, frame in frames.iteritems():
+            ped_pos_predicted = self.live_tracking_frame(frame, ped_pos_init[frame_index])
+            # TODO merge ped_pos_predicted and ped_pos_init[frame_index+1]
+
+
+    # track one or multiple pedestrians in a single frame.
+    # => predict their position in the (unknown) next frame
+    # return value: array containing the predicted positions: ret[ped_index] = [x,y,width,height]
+    # TODO frame_next might be optional
+    def live_tracking_frame(self, frame_prev, frame_curr, frame_next, ped_pos_prev, ped_pos_curr):
+
+        # we will add all pedestrians of a single frame to one (or multiple) batch(es),
+        # so we can evaluate all of them "at once"
+        num_samples = len(ped_pos_prev)
+
+        if num_samples > 0:
+
+            patch_shape = [num_samples, self.size_input[1], self.size_input[2], self.size_input[3]]
+            patches_prev = np.zeros(patch_shape)
+            patches_curr = np.zeros(patch_shape)
+
+            # collect information about single pedestrians
+            for ped_index, ped_pos in ped_pos_prev.iteritems():
+                # get pedestrians image patch from frame_prev
+                patches_prev[ped_index] = None #TODO
+
+            for ped_index, ped_pos in ped_pos_curr.iteritems():
+                # get pedestrians image patch from frame_curr
+                patches_curr[ped_index] = None  # TODO
+
+
+            # run complete batch
+            ped_pos_predicted = self.predict(patches_prev, patches_curr)
+
+            # TODO transform relative coordinates to absolute ones again
+
+        else: #nothing to do here
+            ped_pos_predicted = []
+
+
+        return ped_pos_predicted
+
+    # predict positions for next frame from based on patches_prev and patches_curr
+    # patches_prev.shape == patches_curr.shape == [<num_samples>,self.size_input[1], self.size_input[2], self.size_input[3]]
+    # return.shape == [<num_samples>, 2]
+    # requires data to be preprocessed and extended by gradient values
+    # returned coordinates are relative to output prob map of size self.output_width x self.output_height
+    #   => you need to transform them to absolute coordinates again
+    def predict(self, patches_prev, patches_curr):
+
+        # we store our output in here
+        predictions = np.zeros([patches_prev.shape[0], 2])
+
+        num_iter = int(math.ceil(patches_prev.shape[0] / self.batch_size))
+        step = 0
+        while step < num_iter:
+            start = step * self.batch_size
+            end = (step + 1) * self.batch_size
+            feed_dict = {self.x_previous: patches_prev[start:end],
+                         self.x_current: patches_curr[start:end],
+                         #self.placeholder_labels: y[step * self.batch_size: (step + 1) * self.batch_size],
+                         self.dropout_prob: 1.0}  # deactivate dropout for live system
+            predictions[start:end] = self.session.run(self.position_predicted_2D, feed_dict)
+            step += 1
+
+        return predictions

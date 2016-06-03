@@ -13,13 +13,13 @@ class Preprocessor:
 
         if self.active:
             # preprocessing (will change original data, too!)
-            log.log(".. preprocessing data")  # train only on previous images
+            log.log(".. initialize preprocessing")  # train only on previous images
             self.preprocessInit(min_max_scaling, standardization,
                                 data)  # call this independently of the values of min_max_scaling or standardization!
 
             #TODO those learned parameters needs to be saved with the network
 
-    log.log(".. finished preprocessing data")
+            log.log(".. preprocessing initialized")
 
 
 

@@ -7,6 +7,7 @@ import numpy as np
 import cPickle as pickle
 import log
 import preprocessor as pp
+import visualizer as vs
 
 class CaltechLoader:
 
@@ -370,27 +371,38 @@ class CaltechLoader:
 
                             # potential head position is supposed to be in the center of the current frame
                             # but as we choose the image patch based on the previous and not the current frame,
-                            # the relative position is not guarenteed to be in the center. Calculate the relative
+                            # the relative position is not guaranteed to be in the center. Calculate the relative
                             # position and use it to generate a target probability map.
                             # TODO check whether there is a better target position given in the caltech metadata
-                            absolute_center_x = x_prev + (w_prev * self.head_rel_pos_prev_col)
-                            absolute_center_y = y_prev + (h_prev * self.head_rel_pos_prev_row) #not center, but upper quarter
-                            relative_center_x = absolute_center_x - x
-                            relative_center_y = absolute_center_y - y
+                            absolute_center_x = x + (w * self.head_rel_pos_prev_col)
+                            absolute_center_y = y + (h * self.head_rel_pos_prev_row) #not center, but upper quarter
+                            relative_center_x = absolute_center_x - x_prev
+                            relative_center_y = absolute_center_y - y_prev
 
                             # scale center by same ratio as image
                             relative_center_x *= w_resize_scale
                             relative_center_y *= h_resize_scale
 
-                            # and halve again, because the ouput probability map has only 2px accuracy
+                            # and halve again, because the output probability map has only 2px accuracy
                             relative_center_x /= 2
                             relative_center_y /= 2
 
-                            relative_center_x = round(relative_center_x)
-                            relative_center_y = round(relative_center_y)
+                            relative_center_x = int(round(relative_center_x))
+                            relative_center_y = int(round(relative_center_y))
 
                             probs = self.calcTargetProbMap(relative_center_x, relative_center_y)
                             y_labels.append( probs )
+
+                            # you can visualize this if you want:
+                            if False:
+                                img_test = np.full([64, 24, 3], 255, np.uint8)
+                                img_test[relative_center_y][relative_center_x] = (255, 0, 0)
+                                vis = vs.Visualizer()
+                                cv.imshow('ped prev', img_ped_prev)
+                                cv.imshow('frame current', img_curr)
+                                cv.imshow('ped current', img_ped)
+                                cv.imshow('probability map', probs)
+                                vis.visualizeProbabilityMap(img_test)
 
                             #self.save_img(set_name, video_name, frame_i, img_ped)
 

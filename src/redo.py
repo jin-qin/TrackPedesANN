@@ -43,7 +43,7 @@ cf_log_dir = cf_log_dir_init = "logs"
 cfc_datasetpath_init = "/media/th/6C4C-2ECD/ml_datasets" # path to the (Caltech) dataset. Can be overriden by commandline parameter.
 
 # relative horizontale position assumed for the pedestrians head in the previous frame.
-cf_head_rel_pos_prev_row = 0.25 # 0=top, 1=bottom #TODO verify that the upper and not the lower quarter is used
+cf_head_rel_pos_prev_row = 0.25 # 0=top, 1=bottom
 cf_head_rel_pos_prev_col = 0.5 # 0=left hand side, 1=right hand side, 0.5 = horizontale center
 
 # extracted image patches will be resized to 48x128px,

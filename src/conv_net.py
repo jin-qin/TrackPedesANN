@@ -594,15 +594,24 @@ class ConvolutionalNetwork:
     def live_tracking_video(self, frames, ped_pos_init):
 
         for frame_index, frame in frames.iteritems():
-            ped_pos_predicted = self.live_tracking_frame(frame, ped_pos_init[frame_index])
-            # TODO merge ped_pos_predicted and ped_pos_init[frame_index+1]
+
+            if frame_index > 0:
+                ped_pos_predicted = self.live_tracking_frame(frame_prev, frame, ped_pos_init[frame_index])
+
+                # merge ped_pos_predicted and ped_pos_init[frame_index+1]
+                ped_pos_init[frame_index + 1] = np.append(ped_pos_init[frame_index+1], ped_pos_predicted, axis=0)
+
+                #TODO visualize results
+
+            frame_prev = frame
 
 
     # track one or multiple pedestrians in a single frame.
     # => predict their position in the (unknown) next frame
     # return value: array containing the predicted positions: ret[ped_index] = [x,y,width,height]
-    # TODO frame_next might be optional
-    def live_tracking_frame(self, frame_prev, frame_curr, frame_next, ped_pos_prev, ped_pos_curr):
+    def live_tracking_frame(self, frame_prev, frame_curr, ped_pos_prev):
+
+        global calLoader
 
         # we will add all pedestrians of a single frame to one (or multiple) batch(es),
         # so we can evaluate all of them "at once"
@@ -614,20 +623,43 @@ class ConvolutionalNetwork:
             patches_prev = np.zeros(patch_shape)
             patches_curr = np.zeros(patch_shape)
 
+            # transform head position to top left corner
+            corner_x = ped_pos_prev[0] - (self.head_rel_pos_prev_col * ped_pos_prev[2])
+            corner_y = ped_pos_prev[1] - (self.head_rel_pos_prev_row * ped_pos_prev[3])
+
             # collect information about single pedestrians
             for ped_index, ped_pos in ped_pos_prev.iteritems():
                 # get pedestrians image patch from frame_prev
-                patches_prev[ped_index] = None #TODO
+                patches_prev[ped_index] = frame_prev[corner_x:corner_x + ped_pos_prev[2], corner_y: corner_y + ped_pos_prev[3]]
 
-            for ped_index, ped_pos in ped_pos_curr.iteritems():
                 # get pedestrians image patch from frame_curr
-                patches_curr[ped_index] = None  # TODO
+                patches_curr[ped_index] = frame_curr[corner_x:corner_x + ped_pos_prev[2], corner_y: corner_y + ped_pos_prev[3]]
+
+                # add gradient channels
+                patches_prev[ped_index] = calLoader.wrapImage(patches_prev[ped_index])
+                patches_curr[ped_index] = calLoader.wrapImage(patches_curr[ped_index])
+
+            # preprocess
+            calLoader.get_preprocessor().preprocessData([patches_prev, patches_curr])
 
 
             # run complete batch
             ped_pos_predicted = self.predict(patches_prev, patches_curr)
 
-            # TODO transform relative coordinates to absolute ones again
+            # stretch x and y (do it parallel, if possible)
+            ped_pos_predicted[:][0] *= 2
+            ped_pos_predicted[:][1] *= 2
+
+            # add two new dimension for width and height
+            ped_pos_predicted = np.expand_dims(ped_pos_predicted, axis=2)
+            ped_pos_predicted = np.expand_dims(ped_pos_predicted, axis=3)
+            ped_pos_predicted[:][2] = 0
+            ped_pos_predicted[:][3] = 0
+
+            # add static width and height from given input again
+            # and convert position to absolute coordinates
+            ped_pos_predicted += ped_pos_prev
+
 
         else: #nothing to do here
             ped_pos_predicted = []

@@ -308,7 +308,6 @@ class CaltechLoader:
             self.output_dir, os.path.basename(dname),
             os.path.basename(fn).split('.')[0], i), frame)
 
-
     def extractPedestriansFromImage(self, img_prev, img_curr, set_name, video_name, frame_i, x_prevArr, x_currArr, y_labels):
 
         # keep in mind: when saving and loading json file before, we might need frame_i = str(frame_i)
@@ -478,3 +477,6 @@ class CaltechLoader:
 
     def is_caltech_dataset_folder(self, folder_name):
         return self.is_training_set_part(folder_name) or self.is_test_set_part(folder_name)
+
+    def get_preprocessor(self):
+        return self.preprocessor

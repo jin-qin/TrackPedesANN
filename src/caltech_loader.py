@@ -131,71 +131,95 @@ class CaltechLoader:
 
         log.log('Total number of annotations: {}'.format(all_obj))
 
-    # original source: https://github.com/mitmul/caltech-pedestrian-dataset-converter/blob/master/scripts/convert_seqs.py
-    def loadImages(self, training):
+    def get_video_file_names(self, training):
 
-        log.log("Extracting frames")
-
-        # create output folder if it doesn't exist yet
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
+        results = defaultdict(dict)
 
         imagesets = sorted(glob.glob(os.path.join(self.input_dir, 'set*')))
-
 
         image_folders_only = []
         for dname in imagesets:
             if os.path.isdir(dname):
                 set_name = os.path.basename(dname)
 
-                if training and self.is_training_set_part(set_name) or ((not training) and self.is_test_set_part(set_name)):
+                if training and self.is_training_set_part(set_name) or (
+                    (not training) and self.is_test_set_part(set_name)):
                     image_folders_only.append(dname)
-
 
         log.log("{} extracted image set(s) found".format(len(image_folders_only)))
         skipped = len(imagesets) - len(image_folders_only)
         if skipped > 0:
             log.log("{} further file(s) skipped. Forgot to extract?".format(skipped))
 
-        x_prev, x_curr, y = [], [], []
-
         if len(image_folders_only) > 0:
 
             for dname in image_folders_only:
                 set_name = os.path.basename(dname)
 
-                log.log("Processing set {}".format(set_name))
+                log.log("Loading set {}".format(set_name))
 
-                for fn in sorted(glob.glob('{}/*.seq'.format(dname))):
-                    video_name = os.path.splitext(os.path.basename(fn))[0]
+                files = sorted(glob.glob('{}/*.seq'.format(dname)))
 
-                    log.log("Processing video {} of {}".format(video_name, set_name))
+                if len(files) > 0:
 
-                    cap = cv.VideoCapture(fn)
-                    previousFrame = None
-                    i = 0
-                    while True:
-                        ret, frame = cap.read()
-                        if not ret:
-                            break
-
-                        if i > 0:
-                            self.extractPedestriansFromImage(previousFrame, frame, set_name, video_name, i, x_prev, x_curr, y)
-
-                        # save original raw image on disk?
-                        #self.save_img(dname, fn, i, frame)
-
-                        previousFrame = frame
-                        i += 1
+                    for fn in files:
+                        video_name = os.path.splitext(os.path.basename(fn))[0]
+                        results[video_name] = fn
 
 
-                    # after all frames of this video have been preprocessed, we can start creating pairs
-                    log.log("Number of created sample pairs: {}".format(len(x_prev)))
+        return results
 
-                    # allow only max self.maxSamples pairs for speed up (during development)
-                    if self.maxSamples > 0 and len(x_prev) > self.maxSamples:
-                        log.log("FORCE STOP of dataset loading as the maximum number of samples has been reached");
+
+
+
+    # original source: https://github.com/mitmul/caltech-pedestrian-dataset-converter/blob/master/scripts/convert_seqs.py
+    def loadImages(self, training):
+
+        log.log("Loading frames")
+
+        log.log("Min length image for resizing: {}".format(self.image_size_min_resize))
+
+        # create output folder if it doesn't exist yet
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+
+        videos = self.get_video_file_names(training)
+
+        x_prev, x_curr, y = [], [], []
+
+        if len(videos) > 0:
+
+            for video_name, fn in videos.iteritems():
+
+                temp, set_name = os.path.split(os.path.split(fn)[0])
+
+                log.log("Processing video {} of {}".format(video_name, set_name))
+
+                cap = cv.VideoCapture(fn)
+                previousFrame = None
+                i = 0
+                while True:
+                    ret, frame = cap.read()
+                    if not ret:
                         break
+
+                    if i > 0:
+                        self.extractPedestriansFromImage(previousFrame, frame, set_name, video_name, i, x_prev, x_curr, y)
+
+                    # save original raw image on disk?
+                    #self.save_img(dname, fn, i, frame)
+
+                    previousFrame = frame
+                    i += 1
+
+
+                # after all frames of this video have been preprocessed, we can start creating pairs
+                log.log("Number of created sample pairs: {}".format(len(x_prev)))
+
+                # allow only max self.maxSamples pairs for speed up (during development)
+                if self.maxSamples > 0 and len(x_prev) > self.maxSamples:
+                    log.log("FORCE STOP of dataset loading as the maximum number of samples has been reached");
+                    break
 
 
             log.log("Finished frame extraction and matching.")
@@ -480,3 +504,10 @@ class CaltechLoader:
 
     def get_preprocessor(self):
         return self.preprocessor
+
+    def get_annotations(self):
+
+        if self.annotations is None:
+            self.loadAnnotations()
+
+        return self.annotations

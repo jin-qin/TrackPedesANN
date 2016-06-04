@@ -22,20 +22,22 @@ How to run:
 ###############################################################
 
 # general
-cf_max_samples = 300 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
-cf_num_iters = 450
+cf_max_samples = 200 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
+cf_num_iters = 2
 cf_batch_size = 50
 cf_validation_set_size = round(cf_max_samples * 0.1) # this absolute number of images will be taken from the training images and used as validation data
 cf_min_max_scaling = True #turn on either this or cf_standardization
 cf_standardization = True #turn on either this or cf_min_max_scaling
 cf_learning_rate = 0.9
 cf_learning_rate_decay = 0.95 #1 means no decay
+cf_learning_rate_min = 0.1 * cf_learning_rate #minimum value for learning rate decay
 cf_dropout_rate = 0.5 # 1.0 = no dropout
 cf_optimizer = 2 # 0=GradientDescentOptimizer, 1=AdamOptimizer, 2=MomentumOptimizer(see also cf_momentum)
 cf_momentum = 0.9 #0 deactivates the momentum update. when activating/increasing you may want to decrease cf_learning_rate (the other way around, too).
 cf_accuracy_weight_direction = 0.8 # weight importance of direction vs. distance in accuracy measurements (distance = 1 - direc)
 
 # make your life convenient
+cf_visualize_results = True # if true, the testset will be used to generate videos containing the predictions. Those videos will be save to disk.
 cfc_cache_dataset_hdd = True # reminder: if this is turned on, and you want to change other settings, they might need a cache reset => clear folder
 cf_timeout_minutes = 0 # maximum number of minutes used for training. 0=unlimited
 cf_log_auto_save = True #if True, the log file will be saved automatically as soon as all calculations have been finished correctly
@@ -80,7 +82,7 @@ import numpy as np
 import sys
 import os
 import gc
-
+import visualizer
 
 ###############################################################
 ############# Parameter Tuning Part 1  ### ####################
@@ -244,7 +246,8 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
                                    cf_head_rel_pos_prev_row,
                                    cf_head_rel_pos_prev_col,
                                    cf_accuracy_weight_direction,
-                                   cf_accuracy_weight_distance)
+                                   cf_accuracy_weight_distance,
+                                   cf_learning_rate_min)
 
     # Training
     log.log('Start Training..')
@@ -254,11 +257,25 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
     log.log('.. batch size in each iteration: {}'.format(cf_batch_size))
     log.log('.. learning rate: {}'.format(cf_learning_rate))
     log.log('.. learning rate decay: {}'.format(cf_learning_rate_decay))
-    log.log('.. momentum update: {}'.format(cf_momentum))
+    log.log('.. learning rate minimum: {}'.format(cf_learning_rate_min))
+
+    # print optimizer
+    optimizer_name = "unknown"
+    if cf_optimizer == 0:
+        optimizer_name= "GradientDescentOptimizer"
+    elif cf_optimizer == 1:
+        optimizer_name = "AdamOptimizer"
+    elif cf_optimizer == 2:
+        optimizer_name = "MomentumOptimizer"
+    log.log('.. optimizer: {}'.format(optimizer_name))
+
+    if cf_optimizer == 2:
+        log.log('.. momentum update: {}'.format(cf_momentum))
 
 
     try:
-        net.train()
+        #net.train()
+        var = 2
     except KeyboardInterrupt:
         log.log("WARNING: User interrupted progess. Saving latest results.")
 
@@ -269,6 +286,12 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
             sys.exit()
         else:
             log.log("Results deleted.")
+
+
+    # visualization
+    if cf_visualize_results:
+        visualizer = visualizer.Visualizer()
+        visualizer.visualizeTestVideos(net, calLoader)
 
     redo_finalize(cf_log_auto_save)
 

@@ -20,7 +20,8 @@ class ConvolutionalNetwork:
                  head_rel_pos_prev_row=0.25,
                  head_rel_pos_prev_col=0.5,
                  accuracy_weight_direction=0.8,
-                 accuracy_weight_distance=0.2):
+                 accuracy_weight_distance=0.2,
+                 learning_rate_min=0.01):
 
 
         # save given params
@@ -34,6 +35,7 @@ class ConvolutionalNetwork:
         self.starter_learning_rate = learning_rate
         self.iterations = iterations
         self.learning_rate_decay = learning_rate_decay
+        self.learning_rate_min = learning_rate_min
         self.momentum = momentum
         self.timeout_minutes = timeout_minutes # maximum number of minutes used for training. 0=unlimited
         self.timeout_seconds = self.timeout_minutes * 60
@@ -46,6 +48,9 @@ class ConvolutionalNetwork:
         self.output_height = 64
         self.accuracy_weight_distance = accuracy_weight_distance
         self.accuracy_weight_direction = accuracy_weight_direction
+
+        # create session name that is (in the best case) unique. this name will be used for file names etc.
+        self.session_name = "{}_".format( time.time())
 
         # get input dimension:
         # use original image shape, but resize the number of images to a single batch
@@ -91,7 +96,7 @@ class ConvolutionalNetwork:
         self.runtime_training_start = time.time()
 
         # allow saving results to file
-        summary_writer = tf.train.SummaryWriter(os.path.join(self.log_dir, "tf-summary"), self.session.graph)
+        summary_writer = tf.train.SummaryWriter(os.path.join(self.log_dir, self.session_name + "-tf-summary"), self.session.graph)
 
         interrupt_every_x_steps = min(self.iterations / 2.5, 1000, 10) #TODO remove ", 10" on computer with higher performance
         interrupt_every_x_steps_late = max(self.iterations / 4, 1)
@@ -125,7 +130,7 @@ class ConvolutionalNetwork:
             if (step + 1) % interrupt_every_x_steps == 0 or (step + 1) == self.iterations:
 
                 log.log("Saving checkpoint..")
-                self.saver.save(self.session, os.path.join(self.log_dir, "tf-checkpoint"), global_step=step)
+                self.saver.save(self.session, os.path.join(self.log_dir, self.session_name + "-tf-checkpoint-loss_{}".format(loss_value)), global_step=step)
 
                 # don't print in last run as this will be done anyway
                 if (step + 1) != self.iterations:
@@ -411,8 +416,9 @@ class ConvolutionalNetwork:
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
         # automatically decay learning rate
-        self.learning_rate = tf.train.exponential_decay(self.starter_learning_rate, global_step,
+        self.learning_rate_calc = tf.train.exponential_decay(self.starter_learning_rate, global_step,
                                                         self.iterations / 20, self.learning_rate_decay, staircase=True)
+        self.learning_rate = tf.maximum(self.learning_rate_calc, self.learning_rate_min)
 
         # create optimizer
         if self.optimizer == 2 and self.momentum != 0:
@@ -545,6 +551,9 @@ class ConvolutionalNetwork:
 
         return angle
 
+    def get_session_name(self):
+        return self.session_name
+
 
     # calculate the element-wise arcuscosinus.
     # return value is between 0 and PI
@@ -592,15 +601,23 @@ class ConvolutionalNetwork:
     # ped_pos_init[frame_index][ped_index] = [x,y,width,height]
     #   [x,y] are the supposed coordinates of the pedestrian's head. The head's relative position to a bounding box of
     #   width x height pixels is determined by self.head_rel_pos_prev_row and self.head_rel_pos_prev_col.
-    def live_tracking_video(self, frames, ped_pos_init, visualize=True):
+    def live_tracking_video(self, frames, ped_pos_init, visualize_file_name=None):
 
 
-        if visualize:
+        if not visualize_file_name is None:
+
+            output_folder = 'plots'
+
+            # create output folder if it doesn't exist yet
+            if not os.path.exists(output_folder):
+                os.makedirs(output_folder)
+
             wri = cv.VideoWriter(
-                '/plots/{}_{}.avi'.format("set_name", "video_name"), # TODO change filename
-                cv.VideoWriter_fourcc(*'XVID'), 30, (640, 480))
+                os.path.join(output_folder, visualize_file_name + '.avi'),
+                cv.cv.CV_FOURCC(*'XVID'), 30, (640, 480))
 
-        for frame_index, frame in frames.iteritems():
+        frame_index = 0
+        for frame in frames:
 
             if frame_index > 0:
                 ped_pos_predicted = self.live_tracking_frame(frame_prev, frame, ped_pos_init[frame_index])
@@ -609,15 +626,16 @@ class ConvolutionalNetwork:
                 ped_pos_init[frame_index + 1] = np.append(ped_pos_init[frame_index+1], ped_pos_predicted, axis=0)
 
                 # visualize results
-                if visualize:
+                if not visualize_file_name is None:
                     for ped_index, ped_pos in ped_pos_predicted.iteritems():
                         x, y, w, h = [int(v) for v in ped_pos]
                         cv.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 1)
                     wri.write(frame)
 
             frame_prev = frame
+            frame_index += 1
 
-        if visualize:
+        if not visualize_file_name is None:
             wri.release()
 
         return ped_pos_init
@@ -645,7 +663,8 @@ class ConvolutionalNetwork:
             corner_y = ped_pos_prev[1] - (self.head_rel_pos_prev_row * ped_pos_prev[3])
 
             # collect information about single pedestrians
-            for ped_index, ped_pos in ped_pos_prev.iteritems():
+            ped_index = 0
+            for ped_pos in ped_pos_prev:
                 # get pedestrians image patch from frame_prev
                 patches_prev[ped_index] = frame_prev[corner_x:corner_x + ped_pos_prev[2], corner_y: corner_y + ped_pos_prev[3]]
 
@@ -655,6 +674,8 @@ class ConvolutionalNetwork:
                 # add gradient channels
                 patches_prev[ped_index] = calLoader.wrapImage(patches_prev[ped_index])
                 patches_curr[ped_index] = calLoader.wrapImage(patches_curr[ped_index])
+
+                ped_index += 1
 
             # preprocess
             calLoader.get_preprocessor().preprocessData([patches_prev, patches_curr])

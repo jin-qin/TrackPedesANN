@@ -20,14 +20,19 @@ def log(pMsg, pConsole=True, pFile=True):
 
 
 def logSave(directory):
-    global log_cache, log_name
+    global log_cache, log_name, net
 
     #create dir if it does not exist yet
     if not os.path.exists(directory):
         os.makedirs(directory)
 
+    if net is None:
+        prefix = '{}'.format( time.time())
+    else:
+        prefix = net.get_session_name()
+
     #write to file
-    f = open(directory + '/{}'.format( time.time()) + '-' + log_name + '.txt', 'w')
+    f = open(directory + '/' + prefix + '-' + log_name + '.txt', 'w')
     f.write('\n'.join(log_cache))
     f.close()
 

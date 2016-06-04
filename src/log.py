@@ -19,8 +19,8 @@ def log(pMsg, pConsole=True, pFile=True):
         log_cache.append(time.strftime('%x') + ' ' + msg)
 
 
-def logSave(directory):
-    global log_cache, log_name, net
+def logSave(directory, net=None):
+    global log_cache, log_name
 
     #create dir if it does not exist yet
     if not os.path.exists(directory):

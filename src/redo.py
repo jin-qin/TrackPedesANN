@@ -148,7 +148,7 @@ def redo_finalize(saveLog):
     if saveLog:
 
         log.logSetName(cfc_dataset_name + '-{}p'.format(round(test_acc * 100, 2)))
-        log.logSave(cf_log_dir)
+        log.logSave(cf_log_dir, net)
 
 
 

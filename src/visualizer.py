@@ -50,13 +50,21 @@ class Visualizer:
             vid_frames = annotations[set_name_new][video_name]['frames']
             if not vid_frames is None:
                 for vid_i, vid_frame in vid_frames.iteritems():
+
+                    frame_pos = []
+
                     for data in vid_frame:
                         ped_id = data['id']
 
-                        if not ped_keys.__contains__(ped_id):
-                            ped_pos_init.append(data['pos'])
+                        if not ped_id in ped_keys:
+                            frame_pos.append(data['pos'])
+                            ped_keys.append(ped_id)
+
+                    ped_pos_init.append(frame_pos)
 
             # actual tracking + saving results in file
+            log.log("Start live tracking: " + set_name_new + " " + video_name)
             net.live_tracking_video(frames, ped_pos_init, net.get_session_name() + "-" + set_name_new + "_" + video_name)
+            log.log("Finished live tracking: " + set_name_new + " " + video_name)
 
             set_name_old = set_name_new

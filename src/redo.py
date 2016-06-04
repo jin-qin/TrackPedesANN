@@ -22,8 +22,8 @@ How to run:
 ###############################################################
 
 # general
-cf_max_samples = 200 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
-cf_num_iters = 2
+cf_max_samples = 0 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
+cf_num_iters = 1000
 cf_batch_size = 50
 cf_validation_set_size = round(cf_max_samples * 0.1) # this absolute number of images will be taken from the training images and used as validation data
 cf_min_max_scaling = True #turn on either this or cf_standardization
@@ -81,7 +81,6 @@ import log
 import numpy as np
 import sys
 import os
-import gc
 import visualizer
 
 ###############################################################
@@ -131,37 +130,23 @@ testvals = no_tests
 # this function will be called AFTER training. Or as soon as the user is aborting training.
 def redo_finalize(saveLog):
 
-    global XTrainPrevious, XTrainCurrent, Ytrain, XvalPrevious, XvalCurrent, Yval, calLoader,\
-        cfc_dataset_name, net, cfc_cache_dataset_hdd, cf_min_max_scaling, cf_standardization, cf_max_samples, cf_validation_set_size
+    global cfc_dataset_name, net
 
-    # if not already done, load test data
-    log.log("No testset available yet, start loading it..")
-    XtestPrev, XtestCurr, Ytest = calLoader.getTestData()
-    log.log('Loaded testset, which includes {} images.'.format(XtestPrev.shape[0]))
-
-    val_acc = net.accuracy(XvalPrevious, XvalCurrent, Yval)
-    log.log('FINAL Accuracy validation {0:.3f}%'.format(val_acc * 100))
-
-    test_acc = net.accuracy(XtestPrev, XtestCurr, Ytest)
-    log.log('FINAL Accuracy test {0:.3f}%'.format(test_acc * 100))
-
-    train_acc = net.accuracy(XTrainPrevious, XTrainCurrent, Ytrain)
-    log.log('FINAL Accuracy training {0:.3f}%'.format(train_acc * 100))
-
-    net.closeSession()
-    log.log('.. training finished.')
-
-
+    # print training runtime
     runtime = net.getTrainingRuntimeSeconds()
     minutes = np.floor(runtime / 60)
     seconds = round(((runtime / 60) - minutes) * 60, 2)
     runtime_text = "{} minutes and {} seconds".format(minutes, seconds)
     log.log("total runtime used for training: " + runtime_text)
 
+    # start final evaluation
+    val_acc, test_acc, train_acc = net.final_evaluation()
+
     log.log('########################  END  ################################')
     log.log('###############################################################')
 
     if saveLog:
+
         log.logSetName(cfc_dataset_name + '-{}p'.format(round(test_acc * 100, 2)))
         log.logSave(cf_log_dir)
 
@@ -218,22 +203,15 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
         cfc_datasetpath = sys.argv[1]
 
     # load data
-    log.log('Loading ' + cfc_dataset_name + ' dataset..')
+    log.log('Preparing ' + cfc_dataset_name + ' dataset..')
     if(cf_dataset == 0):
         calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling,
                                      cf_standardization, cf_head_rel_pos_prev_row, cf_head_rel_pos_prev_col,
                                      cf_validation_set_size, cf_image_size_min_resize)
-        XTrainPrevious, XTrainCurrent, Ytrain = calLoader.getTrainingData()
-        XvalPrevious, XvalCurrent, Yval = calLoader.getValidationData()
-
-        gc.collect()
-
-    log.log('.. Trainingset includes {} images.'.format(XTrainPrevious.shape[0]))
-    log.log('.. Validationset includes {} images.'.format(XvalPrevious.shape[0]))
 
 
     # Creating network
-    net = cnn.ConvolutionalNetwork(XTrainPrevious, XTrainCurrent, Ytrain, XvalPrevious, XvalCurrent, Yval,
+    net = cnn.ConvolutionalNetwork(calLoader,
                                    cf_batch_size,
                                    cf_learning_rate,
                                    cf_num_iters,
@@ -274,7 +252,7 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
 
 
     try:
-        #net.train()
+        net.train()
         var = 2
     except KeyboardInterrupt:
         log.log("WARNING: User interrupted progess. Saving latest results.")

@@ -234,12 +234,8 @@ class CaltechLoader:
             log.log("Finished gradient calculations.")
 
             # convert to np
-            x_prev = np.asarray(x_prev, np.float16)
-            x_prev = np.swapaxes(x_prev, 1, 3)
-            x_prev = np.swapaxes(x_prev, 1, 2)
+            x_prev = np.asarray(x_prev, np.float16) #TODO could int work, too? actually int is enough, but during the calcs?
             x_curr = np.asarray(x_curr, np.float16)
-            x_curr = np.swapaxes(x_curr, 1, 3)
-            x_curr = np.swapaxes(x_curr, 1, 2)
             y = np.asarray(y, np.float16)
 
             # resample training data to gain validation dataset
@@ -286,7 +282,7 @@ class CaltechLoader:
 
                     name = "caltech-preprocessor.p"
                     log.log("saving preprocessor data to file")
-                    pickle.dump([self.preprocessor],
+                    pickle.dump(self.preprocessor,
                                 open(os.path.join(self.output_dir, name), "wb"))
 
             else:
@@ -317,13 +313,29 @@ class CaltechLoader:
         return red, green, blue
 
     def wrapImage(self, img):
+
+        # convert image to grayscale
+        # TODO check that used images are in BGR and not RGB
         gray_image = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-        sobelx = cv.Sobel(gray_image, cv.CV_16S, 1, 0, ksize=5) #x
-        sobely = cv.Sobel(gray_image, cv.CV_16S, 0, 1, ksize=5) #y
+
+        # calc gradients
+        # Output dtype = cv2.CV_64F. Then take its absolute and convert to cv2.CV_8U
+        # see http://docs.opencv.org/3.0-beta/doc/py_tutorials/py_imgproc/py_gradients/py_gradients.html#one-important-matter
+        sobelx64f = cv.Sobel(gray_image, cv.CV_64F, 1, 0, ksize=5)
+        abs_sobelx64f = np.absolute(sobelx64f)
+        sobelx_8u = np.uint8(abs_sobelx64f)
+        sobely64f = cv.Sobel(gray_image, cv.CV_64F, 0, 1, ksize=5)
+        abs_sobely64f = np.absolute(sobely64f)
+        sobely_8u = np.uint8(abs_sobely64f)
 
         # put everything together
+        # TODO now we are using RGB instead of BGR, that doesn't fit together.. see above
+        # TODO in live_tracking_frame() we use another method for the same intention, check which one is better and use only one
         red, green, blue = self.split_into_rgb_channels(img)
-        inputSample = np.array([red, green, blue, sobelx, sobely])
+        inputSample = np.array([red, green, blue, sobelx_8u, sobely_8u], dtype=np.float16) #TODO could int work, too? actually int is enough, but during the calcs?
+
+        inputSample = np.swapaxes(inputSample, 0, 2)
+        inputSample = np.swapaxes(inputSample, 0, 1)
 
         return inputSample
 

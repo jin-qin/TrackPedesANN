@@ -5,9 +5,11 @@ import math
 import time
 import os
 import cv2 as cv
+import random
+import string
 
 class ConvolutionalNetwork:
-    def __init__(self, XtrainPrevious, XtrainCurrent, Ytrain, XvalPrevious, XvalCurrent, Yval,
+    def __init__(self, calLoader,
                  batch_size=200,
                  learning_rate=0.01,
                  iterations=3000,
@@ -25,12 +27,7 @@ class ConvolutionalNetwork:
 
 
         # save given params
-        self.XtrainPrevious = XtrainPrevious
-        self.XtrainCurrent = XtrainCurrent
-        self.Ytrain = Ytrain
-        self.XvalPrevious = XvalPrevious
-        self.XvalCurrent = XvalCurrent
-        self.Yval = Yval
+        self.calLoader = calLoader
         self.batch_size = batch_size
         self.starter_learning_rate = learning_rate
         self.iterations = iterations
@@ -50,7 +47,14 @@ class ConvolutionalNetwork:
         self.accuracy_weight_direction = accuracy_weight_direction
 
         # create session name that is (in the best case) unique. this name will be used for file names etc.
-        self.session_name = "{}_".format( time.time())
+        # => timestamp, underscore, 3 random letters
+        self.session_name = "{}_".format( time.time()) + random.choice(string.ascii_letters) + random.choice(string.ascii_letters) + random.choice(string.ascii_letters)
+
+        # load training and validation data
+        self.XtrainPrevious, self.XtrainCurrent, self.Ytrain = calLoader.getTrainingData()
+        self.XvalPrevious, self.XvalCurrent, self.Yval = calLoader.getValidationData()
+        log.log('.. Trainingset includes {} images.'.format(self.XtrainPrevious.shape[0]))
+        log.log('.. Validationset includes {} images.'.format(self.XvalPrevious.shape[0]))
 
         # get input dimension:
         # use original image shape, but resize the number of images to a single batch
@@ -161,6 +165,9 @@ class ConvolutionalNetwork:
         # save final runtime one last time
         # (intermediate updates might have already calculated this value, but only if timeout_minutes > 0)
         self.runtime_training_end = time.time() - self.runtime_training_start
+
+        log.log('.. training finished.')
+
 
     def setUpArchitecture(self):
 
@@ -591,6 +598,33 @@ class ConvolutionalNetwork:
 
         return result
 
+    # this method might get called after the training has been finished
+    def final_evaluation(self):
+
+        log.log("starting final evaluation")
+
+        # if not already done, load test data
+        log.log("No testset available yet, start loading it..")
+        XtestPrev, XtestCurr, Ytest = self.calLoader.getTestData()
+        log.log('Loaded testset, which includes {} images.'.format(XtestPrev.shape[0]))
+
+        val_acc = self.accuracy(self.XvalPrevious, self.XvalCurrent, self.Yval)
+        log.log('FINAL Accuracy validation {0:.3f}%'.format(val_acc * 100))
+
+        test_acc = self.accuracy(XtestPrev, XtestCurr, Ytest)
+        log.log('FINAL Accuracy test {0:.3f}%'.format(test_acc * 100))
+
+        train_acc = self.accuracy(self.XtrainPrevious, self.XtrainCurrent, self.Ytrain)
+        log.log('FINAL Accuracy training {0:.3f}%'.format(train_acc * 100))
+
+        log.log("final evaluation is done.")
+
+        self.closeSession()
+        log.log("session closed")
+
+        return val_acc, test_acc, train_acc
+
+
     # track one or multiple pedestrians in a (complete) video.
     # => starting with a given initial position for each pedestrian, use that position to predict the position in the
     # next frame. Use this position as a new init for the next frame. And so on..
@@ -603,6 +637,7 @@ class ConvolutionalNetwork:
     #   width x height pixels is determined by self.head_rel_pos_prev_row and self.head_rel_pos_prev_col.
     def live_tracking_video(self, frames, ped_pos_init, visualize_file_name=None):
 
+        log.log("tracking {} frames".format(len(frames)))
 
         if not visualize_file_name is None:
 
@@ -620,16 +655,27 @@ class ConvolutionalNetwork:
         for frame in frames:
 
             if frame_index > 0:
-                ped_pos_predicted = self.live_tracking_frame(frame_prev, frame, ped_pos_init[frame_index])
 
-                # merge ped_pos_predicted and ped_pos_init[frame_index+1]
-                ped_pos_init[frame_index + 1] = np.append(ped_pos_init[frame_index+1], ped_pos_predicted, axis=0)
+                log.log("tracking in frame {}".format(frame_index + 1))
+
+                # start tracking (use position from PREVIOUS frame!)
+                ped_pos_predicted = self.live_tracking_frame(frame_prev, frame, ped_pos_init[frame_index -1])
+
+                # merge ped_pos_predicted and ped_pos_init[frame_index]
+                if len(ped_pos_predicted) > 0:
+                    if len(ped_pos_init[frame_index]) > 0:
+                        ped_pos_init[frame_index] = np.append(ped_pos_init[frame_index], ped_pos_predicted, axis=0)
+                    else:
+                        ped_pos_init[frame_index] = ped_pos_predicted
 
                 # visualize results
                 if not visualize_file_name is None:
-                    for ped_index, ped_pos in ped_pos_predicted.iteritems():
+                    for ped_pos in ped_pos_predicted:
                         x, y, w, h = [int(v) for v in ped_pos]
                         cv.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 1)
+
+                    # TODO write the current frame rate (of processing) into the video
+
                     wri.write(frame)
 
             frame_prev = frame
@@ -646,7 +692,10 @@ class ConvolutionalNetwork:
     # return value: array containing the predicted positions: ret[ped_index] = [x,y,width,height]
     def live_tracking_frame(self, frame_prev, frame_curr, ped_pos_prev):
 
-        global calLoader
+
+        # ensure that positions are given as ints only,
+        # so we can use them for direct accessing
+        ped_pos_prev = np.asarray(ped_pos_prev, np.int16)
 
         # we will add all pedestrians of a single frame to one (or multiple) batch(es),
         # so we can evaluate all of them "at once"
@@ -654,49 +703,77 @@ class ConvolutionalNetwork:
 
         if num_samples > 0:
 
-            patch_shape = [num_samples, self.size_input[1], self.size_input[2], self.size_input[3]]
-            patches_prev = np.zeros(patch_shape)
-            patches_curr = np.zeros(patch_shape)
+            log.log("found {} pedestrian(s) in current frame".format(num_samples))
 
-            # transform head position to top left corner
-            corner_x = ped_pos_prev[0] - (self.head_rel_pos_prev_col * ped_pos_prev[2])
-            corner_y = ped_pos_prev[1] - (self.head_rel_pos_prev_row * ped_pos_prev[3])
+            patch_shape = [num_samples, self.size_input[1], self.size_input[2], 5]
+            patches_prev = np.zeros(patch_shape, np.float16)
+            patches_curr = np.zeros(patch_shape, np.float16)
 
             # collect information about single pedestrians
             ped_index = 0
             for ped_pos in ped_pos_prev:
-                # get pedestrians image patch from frame_prev
-                patches_prev[ped_index] = frame_prev[corner_x:corner_x + ped_pos_prev[2], corner_y: corner_y + ped_pos_prev[3]]
 
-                # get pedestrians image patch from frame_curr
-                patches_curr[ped_index] = frame_curr[corner_x:corner_x + ped_pos_prev[2], corner_y: corner_y + ped_pos_prev[3]]
+                # transform head position to top left corner
+                corner_x = ped_pos[0] - int(round(self.head_rel_pos_prev_col * ped_pos[2]))
+                corner_y = ped_pos[1] - int(round(self.head_rel_pos_prev_row * ped_pos[3]))
 
-                # add gradient channels
-                patches_prev[ped_index] = calLoader.wrapImage(patches_prev[ped_index])
-                patches_curr[ped_index] = calLoader.wrapImage(patches_curr[ped_index])
+                # other required corners
+                other_corner_x = corner_x + ped_pos[2]
+                other_corner_y = corner_y + ped_pos[3]
 
-                ped_index += 1
+                # only go on, if all corners are inside of the image (assuming both frames have the same size)
+                # ideally this should happen, if the pedestrian "moves out of the image"
+                # on the other hand, is that possible at all with the current cnn output??
+                if corner_x >= 0 and other_corner_x >= 0 and corner_y >= 0 and other_corner_y >= 0 and corner_y < frame_prev.shape[0] and other_corner_y < frame_prev.shape[0] and corner_x < frame_prev.shape[1] and other_corner_x < frame_prev.shape[1]:
+
+                    # get pedestrians image patch from frame_prev
+                    patch_prev_temp = frame_prev[corner_y:other_corner_y, corner_x:other_corner_x]
+
+                    # get pedestrians image patch from frame_curr
+                    patch_curr_temp = frame_curr[corner_y:other_corner_y, corner_x:other_corner_x]
+
+                    try:
+
+                        # resize patches
+                        patch_prev_temp = cv.resize(patch_prev_temp, (self.size_input[2], self.size_input[1]))
+                        patch_curr_temp = cv.resize(patch_curr_temp, (self.size_input[2], self.size_input[1]))
+
+                        # add gradient channels
+                        patches_prev[ped_index] = self.calLoader.wrapImage(patch_prev_temp)
+                        patches_curr[ped_index] = self.calLoader.wrapImage(patch_curr_temp)
+
+                        ped_index += 1
+                    except Exception as e:
+                        var_temp = 0
+                        # resizing might fail for too small image patches. just ignore/skip those
 
             # preprocess
-            calLoader.get_preprocessor().preprocessData([patches_prev, patches_curr])
+            pre = self.calLoader.get_preprocessor()
+            pre.preprocessData([patches_prev, patches_curr])
 
 
             # run complete batch
             ped_pos_predicted = self.predict(patches_prev, patches_curr)
 
-            # stretch x and y (do it parallel, if possible)
-            ped_pos_predicted[:][0] *= 2
-            ped_pos_predicted[:][1] *= 2
+            # stretch x and y
+            ped_pos_predicted *= 2
 
-            # add two new dimension for width and height
-            ped_pos_predicted = np.expand_dims(ped_pos_predicted, axis=2)
-            ped_pos_predicted = np.expand_dims(ped_pos_predicted, axis=3)
-            ped_pos_predicted[:][2] = 0
-            ped_pos_predicted[:][3] = 0
+            # add two new dimension for width and height (2 => 4)
+            dim_width = np.zeros([ped_pos_predicted.shape[0], 1])
+            dim_height = np.zeros([ped_pos_predicted.shape[0], 1])
+            ped_pos_predicted = np.append(ped_pos_predicted, dim_width, axis=1)
+            ped_pos_predicted = np.append(ped_pos_predicted, dim_height, axis=1)
 
             # add static width and height from given input again
             # and convert position to absolute coordinates
             ped_pos_predicted += ped_pos_prev
+
+            # check for lost persons
+            lost_persons = num_samples - (ped_index + 1)
+            if lost_persons > 0:
+                # get rid of empty data for lost/skipped persons
+                ped_pos_predicted = ped_pos_predicted[0: num_samples - lost_persons -1]
+                log.log("{} person(s) have left the video".format(lost_persons))
 
 
         else: #nothing to do here
@@ -714,7 +791,7 @@ class ConvolutionalNetwork:
     def predict(self, patches_prev, patches_curr):
 
         # we store our output in here
-        predictions = np.zeros([patches_prev.shape[0], 2])
+        predictions = np.zeros([patches_prev.shape[0], 2], np.int16)
 
         num_iter = int(math.ceil(patches_prev.shape[0] / self.batch_size))
         step = 0

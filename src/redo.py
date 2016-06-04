@@ -37,7 +37,7 @@ cf_momentum = 0.9 #0 deactivates the momentum update. when activating/increasing
 cf_accuracy_weight_direction = 0.8 # weight importance of direction vs. distance in accuracy measurements (distance = 1 - direc)
 
 # make your life convenient
-cf_visualize_results = True # if true, the testset will be used to generate videos containing the predictions. Those videos will be save to disk.
+cf_visualize_results = False # if true, the testset will be used to generate videos containing the predictions. Those videos will be save to disk.
 cfc_cache_dataset_hdd = True # reminder: if this is turned on, and you want to change other settings, they might need a cache reset => clear folder
 cf_timeout_minutes = 0 # maximum number of minutes used for training. 0=unlimited
 cf_log_auto_save = True #if True, the log file will be saved automatically as soon as all calculations have been finished correctly

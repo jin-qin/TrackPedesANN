@@ -4,6 +4,7 @@ import numpy as np
 import math
 import time
 import os
+import cv2 as cv
 
 class ConvolutionalNetwork:
     def __init__(self, XtrainPrevious, XtrainCurrent, Ytrain, XvalPrevious, XvalCurrent, Yval,
@@ -591,7 +592,13 @@ class ConvolutionalNetwork:
     # ped_pos_init[frame_index][ped_index] = [x,y,width,height]
     #   [x,y] are the supposed coordinates of the pedestrian's head. The head's relative position to a bounding box of
     #   width x height pixels is determined by self.head_rel_pos_prev_row and self.head_rel_pos_prev_col.
-    def live_tracking_video(self, frames, ped_pos_init):
+    def live_tracking_video(self, frames, ped_pos_init, visualize=True):
+
+
+        if visualize:
+            wri = cv.VideoWriter(
+                '/plots/{}_{}.avi'.format("set_name", "video_name"), # TODO change filename
+                cv.VideoWriter_fourcc(*'XVID'), 30, (640, 480))
 
         for frame_index, frame in frames.iteritems():
 
@@ -601,9 +608,19 @@ class ConvolutionalNetwork:
                 # merge ped_pos_predicted and ped_pos_init[frame_index+1]
                 ped_pos_init[frame_index + 1] = np.append(ped_pos_init[frame_index+1], ped_pos_predicted, axis=0)
 
-                #TODO visualize results
+                # visualize results
+                if visualize:
+                    for ped_index, ped_pos in ped_pos_predicted.iteritems():
+                        x, y, w, h = [int(v) for v in ped_pos]
+                        cv.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 1)
+                    wri.write(frame)
 
             frame_prev = frame
+
+        if visualize:
+            wri.release()
+
+        return ped_pos_init
 
 
     # track one or multiple pedestrians in a single frame.

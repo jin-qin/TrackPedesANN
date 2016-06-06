@@ -25,7 +25,7 @@ How to run:
 cf_max_samples = 0 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
 cf_num_iters = 1000
 cf_batch_size = 50
-cf_validation_set_size = round(cf_max_samples * 0.1) # this absolute number of images will be taken from the training images and used as validation data
+cf_validation_set_size = int(round(cf_max_samples * 0.1)) # this absolute number of images will be taken from the training images and used as validation data
 cf_min_max_scaling = True #turn on either this or cf_standardization
 cf_standardization = True #turn on either this or cf_min_max_scaling
 cf_learning_rate = 0.9
@@ -43,6 +43,7 @@ cf_timeout_minutes = 0 # maximum number of minutes used for training. 0=unlimite
 cf_log_auto_save = True #if True, the log file will be saved automatically as soon as all calculations have been finished correctly
 cf_log_dir = cf_log_dir_init = "logs"
 cfc_datasetpath_init = "/media/th/6C4C-2ECD/ml_datasets" # path to the (Caltech) dataset. Can be overriden by commandline parameter.
+cf_max_batch_size = 250 # maximum number of samples that will be processed at once. Set to None for now limit on high-end computers. otherwise decrease for less memory requirements
 
 # relative horizontale position assumed for the pedestrians head in the previous frame.
 cf_head_rel_pos_prev_row = 0.25 # 0=top, 1=bottom
@@ -50,7 +51,7 @@ cf_head_rel_pos_prev_col = 0.5 # 0=left hand side, 1=right hand side, 0.5 = hori
 
 # extracted image patches will be resized to 48x128px,
 # but we will only resize images with at least one dimension having a minimum of:
-cf_image_size_min_resize = round(48 * 1.25)
+cf_image_size_min_resize = int(round(48 * 1.25))
 
 
 ###############################################################
@@ -225,7 +226,8 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
                                    cf_head_rel_pos_prev_col,
                                    cf_accuracy_weight_direction,
                                    cf_accuracy_weight_distance,
-                                   cf_learning_rate_min)
+                                   cf_learning_rate_min,
+                                   cf_max_batch_size)
 
     # Training
     log.log('Start Training..')

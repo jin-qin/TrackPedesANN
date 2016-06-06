@@ -10,7 +10,7 @@ import string
 
 class ConvolutionalNetwork:
     def __init__(self, calLoader,
-                 batch_size=200,
+                 batch_size_training=200,
                  learning_rate=0.01,
                  iterations=3000,
                  learning_rate_decay=0.96,
@@ -23,12 +23,13 @@ class ConvolutionalNetwork:
                  head_rel_pos_prev_col=0.5,
                  accuracy_weight_direction=0.8,
                  accuracy_weight_distance=0.2,
-                 learning_rate_min=0.01):
+                 learning_rate_min=0.01,
+                 max_batch_size=None):
 
 
         # save given params
         self.calLoader = calLoader
-        self.batch_size = batch_size
+        self.batch_size_training = batch_size_training #static value during training != self.batch_size (the latter is a dynamic tensor)
         self.starter_learning_rate = learning_rate
         self.iterations = iterations
         self.learning_rate_decay = learning_rate_decay
@@ -45,6 +46,7 @@ class ConvolutionalNetwork:
         self.output_height = 64
         self.accuracy_weight_distance = accuracy_weight_distance
         self.accuracy_weight_direction = accuracy_weight_direction
+        self.max_batch_size = max_batch_size
 
         # create session name that is (in the best case) unique. this name will be used for file names etc.
         # => timestamp, underscore, 3 random letters
@@ -57,16 +59,19 @@ class ConvolutionalNetwork:
         log.log('.. Validationset includes {} images.'.format(self.XvalPrevious.shape[0]))
 
         # get input dimension:
-        # use original image shape, but resize the number of images to a single batch
+        # original image shape, but use dynamic size for first dimension in order to allow different batch sizes
         self.size_input = []
         orig_img_shape = tf.TensorShape(self.XtrainPrevious.shape).as_list()
         for i in range(len(orig_img_shape)):
             if i > 0:
                 self.size_input.append(orig_img_shape[i])
             else:
-                self.size_input.append(self.batch_size)
+                self.size_input.append(None)
 
-        # some output
+        self.size_input = [None, self.XtrainPrevious.shape[1], self.XtrainPrevious.shape[2], self.XtrainPrevious.shape[3]]
+
+
+            # some output
         log.log('Creating network..')
         log.log('.. Input dimension: {}.'.format(self.size_input))
         log.log('.. drop out between S2 and C3 active: {}'.format(self.dropout_rate > 0 and self.dropout_rate < 1))
@@ -107,10 +112,10 @@ class ConvolutionalNetwork:
         for step in range(self.iterations):
 
             # get a batch of training samples
-            offset = (step * self.batch_size) % (self.Ytrain.shape[0] - self.batch_size)
-            batch_data_previous = self.XtrainPrevious[offset:(offset + self.batch_size), :]
-            batch_data_current = self.XtrainCurrent[offset:(offset + self.batch_size), :]
-            batch_labels = self.Ytrain[offset:(offset + self.batch_size)]
+            offset = (step * self.batch_size_training) % (self.Ytrain.shape[0] - self.batch_size_training)
+            batch_data_previous = self.XtrainPrevious[offset:(offset + self.batch_size_training), :]
+            batch_data_current = self.XtrainCurrent[offset:(offset + self.batch_size_training), :]
+            batch_labels = self.Ytrain[offset:(offset + self.batch_size_training)]
 
             # finally start training with current batch
             feed_dict ={self.x_previous:batch_data_previous,
@@ -183,6 +188,9 @@ class ConvolutionalNetwork:
         self.placeholder_labels = tf.placeholder(tf.float32,
                                                  shape=(self.size_input[0], self.output_height, self.output_width),
                                                  name="y_pos_probs")
+
+        # save batch size as dynamic tensor
+        self.batch_size = tf.shape(self.x_previous)[0]
 
         # Layer C1: convolutional layer with 10 feature maps
         # each feature map will be created independently
@@ -408,8 +416,9 @@ class ConvolutionalNetwork:
 
             # tensorflow can only evaluate 2D results. So we just handle each pixel of the probability map as a single
             # class => flattening needed
-            self.scoresFlattened = tf.reshape(self.scores, [self.batch_size, -1])
-            self.targetProbsFlattened = tf.reshape(self.placeholder_labels, [self.batch_size, -1])
+            # tf.pack() allows using a dynamic batch_size
+            self.scoresFlattened = tf.reshape(self.scores, tf.pack([self.batch_size, -1]))
+            self.targetProbsFlattened = tf.reshape(self.placeholder_labels, tf.pack([self.batch_size, -1]))
 
             # apply softmax on target map
             self.targetProbsFlattened = tf.nn.softmax(self.targetProbsFlattened)
@@ -459,11 +468,12 @@ class ConvolutionalNetwork:
         ## accuracy Begin ###
 
         # the (supposed) position of a pedestrian's head will always be the same for all PREVIOUS frames
-        # => once copy same value for one batch size, so we can use this during training
-        self.position_previous_2D_batch = np.zeros([self.batch_size, 2])
-        for x in self.position_previous_2D_batch:
-            x[0] = self.output_height * self.head_rel_pos_prev_row
-            x[1] = self.output_width * self.head_rel_pos_prev_col
+        # => once prepare same value for one batch size, so we can use this during training
+        # => update: instead of copying the same value, we just use an array with shape [1,2] which will be broadcasted
+        # TODO x and y correct order? especially compare data in caltech and the loader
+        row = int(round(self.output_height * self.head_rel_pos_prev_row))
+        col = int(round(self.output_width * self.head_rel_pos_prev_col))
+        self.position_previous_2D_batch = np.array([[row, col]])
 
         self.position_predicted_2D = self.get_target_position(self.scoresFlattened)
         position_real_2D = self.get_target_position(self.targetProbsFlattened)
@@ -485,6 +495,9 @@ class ConvolutionalNetwork:
         # combine angle and distance differences to total accuracy
         self.check_results = self.accuracy_weight_direction * diff_direction + self.accuracy_weight_distance * diff_distance
 
+        # calculate a single mean value instead of <batch_size> values
+        self.calc_accuracy = tf.reduce_mean(tf.cast(self.check_results, tf.float32))
+
         ## accuracy End ###
 
 
@@ -492,34 +505,49 @@ class ConvolutionalNetwork:
 
         # TODO does this give the correct position?
         # TODO (not needed for accuracy, but for "real" tracking:) scale is still 0.5, so we need to multiply by 2
-        position_predicted_1D = tf.reshape(tf.argmax(probs_1d, 1),[self.batch_size, 1])
+        position_predicted_1D = tf.reshape(tf.argmax(probs_1d, 1),tf.pack([self.batch_size, 1]))
         row = position_predicted_1D / self.output_width  # needs to be floored
         column = position_predicted_1D % self.output_width
         position_predicted_2D = tf.concat(1,[row,column])
 
         return position_predicted_2D
 
-    def accuracy(self, x_prev, x_curr, y):
-        total_sample_count = x_prev.shape[0]
-        num_iter = int(math.ceil(total_sample_count / float(self.batch_size)))
-        true_count = 0  # sum up all single accuracies
-        step = 0
-        while step < num_iter:
-            i_from = step * self.batch_size
-            i_to = (step + 1) * self.batch_size # we use this for the input to ensure the fixed batch size
-            i_to_real = min(i_to, total_sample_count) # but our actual dataset might be smaller, so we only use data up to here
-            feed_dict = {self.x_previous: x_prev[i_from : i_to],
-                         self.x_current: x_curr[i_from : i_to],
-                         self.placeholder_labels: y[i_from : i_to],
-                         self.dropout_prob: 1.0} #deactivate dropout for testing
-            predictions = self.session.run(self.check_results, feed_dict)
-            true_count += np.sum(predictions[0 : i_to_real - i_from])
-            step += 1
 
-        # Compute precision @ 1.
-        precision = true_count
-        if total_sample_count > 0:
-            precision /= float(total_sample_count)
+    # if self.max_batch_size = None => do all at once
+    # otherwise split up dataset in batches of size max_batch_size
+    def accuracy(self, x_prev, x_curr, y):
+
+        if self.max_batch_size is None: #do all at once
+            feed_dict = {self.x_previous: x_prev,
+                         self.x_current: x_curr,
+                         self.placeholder_labels: y,
+                         self.dropout_prob: 1.0} #deactivate dropout for testing
+            precision = self.session.run(self.calc_accuracy, feed_dict)
+
+        #split up dataset in batches of size max_batch_size
+        else:
+
+            total_sample_count = x_prev.shape[0]
+            num_iter = int(math.ceil(total_sample_count / float(self.max_batch_size)))
+            true_count = 0  # sum up all single accuracies
+            step = 0
+            while step < num_iter:
+                i_from = step * self.max_batch_size
+                i_to = (step + 1) * self.max_batch_size  # we use this for the input to ensure the fixed batch size
+                i_to_real = min(i_to,
+                                total_sample_count)  # but our actual dataset might be smaller, so we only use data up to here
+                feed_dict = {self.x_previous: x_prev[i_from: i_to],
+                             self.x_current: x_curr[i_from: i_to],
+                             self.placeholder_labels: y[i_from: i_to],
+                             self.dropout_prob: 1.0}  # deactivate dropout for testing
+                predictions = self.session.run(self.check_results, feed_dict)
+                true_count += np.sum(predictions[0: i_to_real - i_from])
+                step += 1
+
+            # Compute precision @ 1.
+            precision = true_count
+            if total_sample_count > 0:
+                precision /= float(total_sample_count)
 
         return precision
 
@@ -666,7 +694,7 @@ class ConvolutionalNetwork:
 
                 # merge ped_pos_predicted and ped_pos_init[frame_index]
                 if len(ped_pos_predicted) > 0:
-                    if len(ped_pos_init[frame_index]) > 0:
+                    if len(ped_pos_init) > frame_index:
                         ped_pos_init[frame_index] = np.append(ped_pos_init[frame_index], ped_pos_predicted, axis=0)
                     else:
                         ped_pos_init[frame_index] = ped_pos_predicted
@@ -793,23 +821,11 @@ class ConvolutionalNetwork:
     #   => you need to transform them to absolute coordinates again
     def predict(self, patches_prev, patches_curr):
 
-        total_sample_count = patches_prev.shape[0]
+        feed_dict = {self.x_previous: patches_prev,
+                     self.x_current: patches_curr,
+                     # self.placeholder_labels: y,
+                     self.dropout_prob: 1.0}  # deactivate dropout for live system
 
-        # we store our output in here
-        predictions = np.zeros([total_sample_count, 2], np.int16)
-
-        num_iter = int(math.ceil(total_sample_count / float(self.batch_size)))
-        step = 0
-        while step < num_iter:
-            start = step * self.batch_size
-            end = (step + 1) * self.batch_size
-            end_real = min(end, total_sample_count)
-            feed_dict = {self.x_previous: patches_prev[start:end],
-                         self.x_current: patches_curr[start:end],
-                         #self.placeholder_labels: y[step * self.batch_size: (step + 1) * self.batch_size],
-                         self.dropout_prob: 1.0}  # deactivate dropout for live system
-            predictions_batch = self.session.run(self.position_predicted_2D, feed_dict)
-            predictions[start:end_real] = predictions_batch[0:end_real - start]
-            step += 1
+        predictions = self.session.run(self.position_predicted_2D, feed_dict)
 
         return predictions

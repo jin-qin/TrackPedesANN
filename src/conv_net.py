@@ -685,6 +685,11 @@ class ConvolutionalNetwork:
         frame_index = 0
         for frame in frames:
 
+            # if this frame doesn't provide any information yet, we need to add an empty list before extending it
+            # this assumes, that there are information about the previous frame
+            if len(ped_pos_init) <= frame_index:
+                ped_pos_init.append([])
+
             if frame_index > 0:
 
                 log.log("tracking in frame {}".format(frame_index + 1))
@@ -694,10 +699,13 @@ class ConvolutionalNetwork:
 
                 # merge ped_pos_predicted and ped_pos_init[frame_index]
                 if len(ped_pos_predicted) > 0:
-                    if len(ped_pos_init) > frame_index:
+
+                    if len(ped_pos_init[frame_index]) > 0:
                         ped_pos_init[frame_index] = np.append(ped_pos_init[frame_index], ped_pos_predicted, axis=0)
                     else:
                         ped_pos_init[frame_index] = ped_pos_predicted
+
+
 
                 # visualize results
                 if not visualize_file_name is None:

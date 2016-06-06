@@ -15,6 +15,10 @@ How to run:
     + annotations
     + one extracted archive containing training data (set00 - set05)
     + one extracted archive containing test data (set06 - set10)
+
+Other nodes:
+- images are stored in opencv shape [height, width]
+- BUT single coordinates are stored as provided in the caltech dataset => [x,y] (cv would be [y,x] = [row,col])
 '''
 
 ###############################################################

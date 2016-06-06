@@ -50,7 +50,7 @@ cf_head_rel_pos_prev_col = 0.5 # 0=left hand side, 1=right hand side, 0.5 = hori
 
 # extracted image patches will be resized to 48x128px,
 # but we will only resize images with at least one dimension having a minimum of:
-cf_image_size_min_resize = 48 * 1.25
+cf_image_size_min_resize = round(48 * 1.25)
 
 
 ###############################################################
@@ -63,7 +63,7 @@ cf_dataset = 0
 cf_accuracy_weight_distance = 1 - cf_accuracy_weight_direction
 
 # validation set needs at least as much images as included in one batch in order to allow accuracy evaluation
-cf_validation_set_size = max(cf_validation_set_size, cf_batch_size)
+#cf_validation_set_size = max(cf_validation_set_size, cf_batch_size)
 
 if cf_dataset == 0:
     cfc_dataset_name = 'Caltech'

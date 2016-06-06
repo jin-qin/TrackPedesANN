@@ -500,23 +500,26 @@ class ConvolutionalNetwork:
         return position_predicted_2D
 
     def accuracy(self, x_prev, x_curr, y):
-        num_iter = int(math.ceil(x_prev.shape[0] / self.batch_size))
+        total_sample_count = x_prev.shape[0]
+        num_iter = int(math.ceil(total_sample_count / float(self.batch_size)))
         true_count = 0  # sum up all single accuracies
-        total_sample_count = num_iter * self.batch_size
         step = 0
         while step < num_iter:
-            feed_dict = {self.x_previous: x_prev[step * self.batch_size: (step + 1) * self.batch_size],
-                         self.x_current: x_curr[step * self.batch_size: (step + 1) * self.batch_size],
-                         self.placeholder_labels: y[step * self.batch_size: (step + 1) * self.batch_size],
+            i_from = step * self.batch_size
+            i_to = (step + 1) * self.batch_size # we use this for the input to ensure the fixed batch size
+            i_to_real = min(i_to, total_sample_count) # but our actual dataset might be smaller, so we only use data up to here
+            feed_dict = {self.x_previous: x_prev[i_from : i_to],
+                         self.x_current: x_curr[i_from : i_to],
+                         self.placeholder_labels: y[i_from : i_to],
                          self.dropout_prob: 1.0} #deactivate dropout for testing
             predictions = self.session.run(self.check_results, feed_dict)
-            true_count += np.sum(predictions)
+            true_count += np.sum(predictions[0 : i_to_real - i_from])
             step += 1
 
         # Compute precision @ 1.
         precision = true_count
         if total_sample_count > 0:
-            precision /= total_sample_count
+            precision /= float(total_sample_count)
 
         return precision
 
@@ -790,19 +793,23 @@ class ConvolutionalNetwork:
     #   => you need to transform them to absolute coordinates again
     def predict(self, patches_prev, patches_curr):
 
-        # we store our output in here
-        predictions = np.zeros([patches_prev.shape[0], 2], np.int16)
+        total_sample_count = patches_prev.shape[0]
 
-        num_iter = int(math.ceil(patches_prev.shape[0] / self.batch_size))
+        # we store our output in here
+        predictions = np.zeros([total_sample_count, 2], np.int16)
+
+        num_iter = int(math.ceil(total_sample_count / float(self.batch_size)))
         step = 0
         while step < num_iter:
             start = step * self.batch_size
             end = (step + 1) * self.batch_size
+            end_real = min(end, total_sample_count)
             feed_dict = {self.x_previous: patches_prev[start:end],
                          self.x_current: patches_curr[start:end],
                          #self.placeholder_labels: y[step * self.batch_size: (step + 1) * self.batch_size],
                          self.dropout_prob: 1.0}  # deactivate dropout for live system
-            predictions[start:end] = self.session.run(self.position_predicted_2D, feed_dict)
+            predictions_batch = self.session.run(self.position_predicted_2D, feed_dict)
+            predictions[start:end_real] = predictions_batch[0:end_real - start]
             step += 1
 
         return predictions

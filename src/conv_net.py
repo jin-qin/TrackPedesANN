@@ -725,6 +725,8 @@ class ConvolutionalNetwork:
 
         return ped_pos_init
 
+    def valid_coordinates(self, x, y, image):
+        return x >= 0 and y >= 0 and y < image.shape[0] and x < image.shape[1]
 
     # track one or multiple pedestrians in a single frame.
     # => predict their position in the (unknown) next frame
@@ -760,11 +762,11 @@ class ConvolutionalNetwork:
                 other_corner_x = corner_x + ped_pos[2]
                 other_corner_y = corner_y + ped_pos[3]
 
-                # only go on, if all corners are inside of the image (assuming both frames have the same size)
+                # only go on, if all corners are inside of the image
                 # ideally this should happen, if the pedestrian "moves out of the image"
                 # on the other hand, is that possible at all with the current cnn output??
-                if corner_x >= 0 and other_corner_x >= 0 and corner_y >= 0 and other_corner_y >= 0 and corner_y < frame_prev.shape[0] and other_corner_y < frame_prev.shape[0] and corner_x < frame_prev.shape[1] and other_corner_x < frame_prev.shape[1]:
-
+                if self.valid_coordinates(corner_x, corner_y, frame_prev) and self.valid_coordinates(other_corner_x, other_corner_y, frame_prev)\
+                        and self.valid_coordinates(corner_x, corner_y, frame_curr) and self.valid_coordinates(other_corner_x, other_corner_y, frame_curr):
                     # get pedestrians image patch from frame_prev
                     patch_prev_temp = frame_prev[corner_y:other_corner_y, corner_x:other_corner_x]
 

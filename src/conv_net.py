@@ -473,7 +473,7 @@ class ConvolutionalNetwork:
         # TODO x and y correct order? especially compare data in caltech and the loader
         row = int(round(self.output_height * self.head_rel_pos_prev_row))
         col = int(round(self.output_width * self.head_rel_pos_prev_col))
-        self.position_previous_2D_batch = np.array([[row, col]])
+        self.position_previous_2D_batch = np.array([[col, row]])
 
         self.position_predicted_2D = self.get_target_position(self.scoresFlattened)
         position_real_2D = self.get_target_position(self.targetProbsFlattened)
@@ -508,7 +508,7 @@ class ConvolutionalNetwork:
         position_predicted_1D = tf.reshape(tf.argmax(probs_1d, 1),tf.pack([self.batch_size, 1]))
         row = position_predicted_1D / self.output_width  # needs to be floored
         column = position_predicted_1D % self.output_width
-        position_predicted_2D = tf.concat(1,[row,column])
+        position_predicted_2D = tf.concat(1,[column,row])
 
         return position_predicted_2D
 

@@ -133,8 +133,8 @@ ENV/
 # Rope project settings
 .ropeproject
 
-
-logs/*
-plots/*
+# Data
+src/data/
+src/py_faster_rcnn/data/faster_rcnn_models/
 src/logs/*
-src/plots/*
+plots/*

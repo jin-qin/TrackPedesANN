@@ -328,7 +328,6 @@ class CaltechLoader:
         sobely_8u = np.uint8(abs_sobely64f)
 
         # put everything together
-        # TODO in live_tracking_frame() we use another method for the same intention, check which one is better and use only one
         red, green, blue = self.split_into_rgb_channels(img)
         inputSample = np.array([blue, green, red, sobelx_8u, sobely_8u], dtype=np.float16)
 

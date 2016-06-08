@@ -138,3 +138,5 @@ src/data/
 src/py_faster_rcnn/data/faster_rcnn_models/
 src/logs/*
 plots/*
+src/py_faster_rcnn/tools/*.avi
+src/plots/*.avi

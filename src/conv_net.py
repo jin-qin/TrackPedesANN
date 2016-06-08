@@ -95,6 +95,7 @@ class ConvolutionalNetwork:
                               padding="SAME")
 
     def vars_W_b(self, shape_W):
+
         W_conv1 = tf.Variable(tf.truncated_normal(shape=shape_W, stddev=1.0 / math.sqrt(float(shape_W[0]))))
         b_conv1 = tf.Variable(tf.constant(0.1, tf.float32, [shape_W[-1]]))
         return W_conv1, b_conv1
@@ -107,12 +108,11 @@ class ConvolutionalNetwork:
         # allow saving results to file
         summary_writer = tf.train.SummaryWriter(os.path.join(self.log_dir, self.session_name + "-tf-summary"), self.session.graph)
 
-        interrupt_every_x_steps = min(self.iterations / 4, 1000, 10) #TODO remove ", 10" on computer with higher performance
-        interrupt_every_x_steps_late = max(self.iterations / 2, 1)
+        interrupt_every_x_steps = min(self.iterations / 2.5, 1000, 100) #TODO remove ", 10" on computer with higher performance
+        interrupt_every_x_steps_late = max(self.iterations / 4, 1)
         for step in range(self.iterations):
 
             # get a batch of training samples
-            # TODO shuffle after each complete data coverage
             offset = (step * self.batch_size_training) % (self.Ytrain.shape[0] - self.batch_size_training)
             batch_data_previous = self.XtrainPrevious[offset:(offset + self.batch_size_training), :]
             batch_data_current = self.XtrainCurrent[offset:(offset + self.batch_size_training), :]
@@ -209,7 +209,7 @@ class ConvolutionalNetwork:
         W_conv, b_conv, h_pool, S1 = [], [], [], []
         for i in range(self.conv1_independent_parts):
             with tf.name_scope("C1_part{}".format(i + 1)):
-
+                # Checked OK
                 W_conv1, b_conv1 = self.vars_W_b(
                     [self.conv_filter_width, self.conv_filter_height, single_image_channels,
                      self.number_of_filters_conv1])
@@ -316,6 +316,8 @@ class ConvolutionalNetwork:
                 self.conv2_filter_width = 3
                 self.number_of_filters_conv2 = 1
                 c2number_channels = c2_input.get_shape()[-1].value
+                
+                # Checked OK
                 W_conv2, b_conv2 = self.vars_W_b(
                     [self.conv2_filter_width, self.conv2_filter_height, c2number_channels,
                      self.number_of_filters_conv2])
@@ -347,18 +349,23 @@ class ConvolutionalNetwork:
                 S2[20], S2[21], S2[22], S2[23], S2[24], S2[25], S2[26], S2[27], S2[28], S2[29],
                 S2[30], S2[31], S2[32]
             ])
-
+            print '1_1',c3_input
+            print c3_input.get_shape()
             # in the paper they propose using "10 random choices" instead of all 33. How to implement?
             # dropout comes closest to this definition without keeping data untouched
             if self.dropout_rate != 1.0:
                 with tf.name_scope("dropout"):
                     self.dropout_prob = tf.placeholder(tf.float32)
                     c3_input = tf.nn.dropout(c3_input, self.dropout_prob)
-
+            print '1_2',c3_input
             self.conv3_filter_height = 7
             self.conv3_filter_width = 3
             self.number_of_filters_conv3 = 1
+            print c3_input.get_shape()
             c3number_channels = c3_input.get_shape()[-1].value
+            
+            print '2',[self.conv3_filter_width, self.conv3_filter_height, c3number_channels,
+                 self.number_of_filters_conv3]
             W_conv3, b_conv3 = self.vars_W_b(
                 [self.conv3_filter_width, self.conv3_filter_height, c3number_channels,
                  self.number_of_filters_conv3])
@@ -386,6 +393,8 @@ class ConvolutionalNetwork:
             self.conv4_filter_width = 7
             self.number_of_filters_conv4 = 1
             c4number_channels = c4_input.get_shape()[-1].value
+            print '3',[self.conv4_filter_width, self.conv4_filter_height, c4number_channels,
+                 self.number_of_filters_conv4]
             W_conv4, b_conv4 = self.vars_W_b(
                 [self.conv4_filter_width, self.conv4_filter_height, c4number_channels,
                  self.number_of_filters_conv4])
@@ -395,6 +404,8 @@ class ConvolutionalNetwork:
             C4 = self.conv2d(c4_input, W_conv4) + b_conv4
 
         # TODO the paper mentiones a translation transfrom at this point. Check out what this means and if we need
+        print '4',[self.conv4_filter_width, self.conv4_filter_height, c4number_channels,
+                 self.number_of_filters_conv4]
         W_conv4, b_conv4 = self.vars_W_b(
             [self.conv4_filter_width, self.conv4_filter_height, c4number_channels,
              self.number_of_filters_conv4])
@@ -407,7 +418,9 @@ class ConvolutionalNetwork:
         # remove last dimension of shape 1 from tensors
         C3 = tf.squeeze(C3)
         C4 = tf.squeeze(C4)
-
+        
+        print '5',[self.output_height, self.output_width]
+                 
         finalW1, finalB1 = self.vars_W_b([self.output_height, self.output_width])  # finalB1 will not be used
         finalW2, finalB2 = self.vars_W_b([self.output_height, self.output_width])
         self.scores = tf.sigmoid(tf.mul(C3, finalW1) + tf.mul(C4, finalW2) + finalB2)

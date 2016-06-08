@@ -23,6 +23,7 @@ import numpy as np
 import scipy.io as sio
 import caffe, os, sys, cv2
 import argparse
+from PIL import Image
 
 CLASSES = ('__background__',
            'aeroplane', 'bicycle', 'bird', 'boat',
@@ -43,32 +44,11 @@ def vis_detections(im, class_name, dets, thresh=0.5):
     if len(inds) == 0:
         return
 
-    im = im[:, :, (2, 1, 0)]
-    fig, ax = plt.subplots(figsize=(12, 12))
-    ax.imshow(im, aspect='equal')
     for i in inds:
         bbox = dets[i, :4]
         score = dets[i, -1]
-        #print i
-        #print bbox[0],bbox[1],bbox[2],bbox[3]
-        ax.add_patch(
-            plt.Rectangle((bbox[0], bbox[1]),
-                          bbox[2] - bbox[0],
-                          bbox[3] - bbox[1], fill=False,
-                          edgecolor='red', linewidth=3.5)
-            )
-        ax.text(bbox[0], bbox[1] - 2,
-                '{:s} {:.3f}'.format(class_name, score),
-                bbox=dict(facecolor='blue', alpha=0.5),
-                fontsize=14, color='white')
-
-    ax.set_title(('{} detections with '
-                  'p({} | box) >= {:.1f}').format(class_name, class_name,
-                                                  thresh),
-                  fontsize=14)
-    plt.axis('off')
-    plt.tight_layout()
-    plt.draw()
+        cv2.rectangle(im, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255, 0, 0), 2)
+    return im
 
 def get_objects(dets,thresh):
     inds = np.where(dets[:, -1] >= thresh)[0]
@@ -82,15 +62,8 @@ def get_objects(dets,thresh):
     return {'objects':bboxs,'scores':scores}
     
 
-def detect_objects(imgs_path,is_gpu=True):
-    """
-
-    :param imgs_path: The path of images, should be a list, e.g. # im_names = ['000456.jpg', '000542.jpg', '001150.jpg', '001763.jpg', '004545.jpg']
-    :param is_gpu: Using CPU or CPU, default is GPU
-    :return:
-    """
+def setup_model(is_gpu=True):
     cfg.TEST.HAS_RPN = True  # Use RPN for proposals
-
 
     prototxt = os.path.join(cfg.MODELS_DIR, NETS['vgg16'][0],
                             'faster_rcnn_alt_opt', 'faster_rcnn_test.pt')
@@ -110,6 +83,16 @@ def detect_objects(imgs_path,is_gpu=True):
     net = caffe.Net(prototxt, caffemodel, caffe.TEST)
 
     print '\n\nLoaded network {:s}'.format(caffemodel)
+    return net
+
+def detect_objects(img,net,is_gpu=True):
+    """
+    Detect the pedestrians from image
+    :param img: input image (OpenCV format)
+    :param net: Get from function: setup_model()
+    :param is_gpu:  Using GPU or not
+    :return: detected_img,all_objects,all_scores
+    """
 
     # Warmup on a dummy image
     im = 128 * np.ones((300, 500, 3), dtype=np.uint8)
@@ -118,27 +101,20 @@ def detect_objects(imgs_path,is_gpu=True):
 
     all_objects=[]
     all_scores=[]
-    if isinstance(imgs_path,str):
-        detected_results = detect(net, imgs_path, 'person')
+    detected_img,detected_results = detect(net, img, 'person')
+    if detected_results!=None:
         all_objects.append(detected_results['objects'])
         all_scores.append(detected_results['scores'])
-    elif isinstance(imgs_path,list):
-        for im_path in imgs_path:
-            print im_path
-            detected_results=detect(net, im_path, 'person')
-            all_objects.append(detected_results['objects'])
-            all_scores.append(detected_results['scores'])
     else:
-        print 'Wrong paths!'
+        all_objects=[]
+        all_scores=[]
+    return detected_img,all_objects,all_scores
 
-    plt.show()
-    return all_objects,all_scores
-
-def detect(net, image_path,cls):
+def detect(net, im,cls):
     """Detect object classes in an image using pre-computed object proposals."""
 
     # Load the demo image
-    im = cv2.imread(image_path)
+    #im = cv2.imread(image_path)
 
     # Detect all object classes and regress object bounds
     timer = Timer()
@@ -153,7 +129,7 @@ def detect(net, image_path,cls):
     NMS_THRESH = 0.3
     cls_ind = CLASSES.index(cls)
     cls_boxes = boxes[:, 4*cls_ind:4*(cls_ind + 1)]
-    #print cls_boxes
+
     cls_scores = scores[:, cls_ind]
     keep = np.where(cls_scores >= CONF_THRESH)[0]
     cls_boxes = cls_boxes[keep, :]
@@ -164,10 +140,27 @@ def detect(net, image_path,cls):
     keep = nms(dets, NMS_THRESH)
     dets = dets[keep, :]
 
-    print 'All {} detections with p({} | box) >= {:.1f}'.format(cls, cls,
-                                                                CONF_THRESH)
-    vis_detections(im, cls, dets, thresh=CONF_THRESH)
-    return get_objects(dets,thresh=CONF_THRESH)
+    print 'All {} detections with p({} | box) >= {:.1f}'.format(cls, cls,CONF_THRESH)
+
+    if list(dets)!=[]:
+        detected_img=vis_detections(im, cls, dets, thresh=CONF_THRESH)
+    else:
+        detected_img=im
+    return detected_img,get_objects(dets,thresh=CONF_THRESH)
+
+def detect_objects_from_video(video_path,is_gpu=True):
+    cap=cv2.VideoCapture(video_path)
+    print video_path
+    net=setup_model()
+    video_writer = cv2.VideoWriter('test_video.avi',cv2.cv.CV_FOURCC('X','V','I','D'),24,(640,480))
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        detected_img=detect_objects(frame,net)
+        video_writer.write(detected_img[0])
+    video_writer.release()
+
 
 def parse_args():
     """Parse input arguments."""
@@ -186,8 +179,9 @@ def parse_args():
     return args
 
 if __name__ == '__main__':
-    args=parse_args()
-    imgs_path=args.images_path
-    print imgs_path
-    all_objects,all_scores=detect_objects(imgs_path)
-    np.save('detected_results',all_objects)
+    #args=parse_args()
+    #imgs_path=args.images_path
+    #print imgs_path
+    #all_objects,all_scores=detect_objects(imgs_path)
+    #np.save('detected_results',all_objects)
+    detect_objects_from_video('/home/jin/Desktop/TrackingCNN/src/data/caltech/set00/V000.seq')

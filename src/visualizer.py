@@ -64,7 +64,7 @@ class Visualizer:
 
             # actual tracking + saving results in file
             log.log("Start live tracking: " + set_name_new + " " + video_name)
-            net.live_tracking_video(frames, ped_pos_init, net.get_session_name() + "-" + set_name_new + "_" + video_name)
+            net.live_tracking_video(frames, ped_pos_init, net.get_session_name() + "-" + set_name_new + "_" + video_name, 10)
             log.log("Finished live tracking: " + set_name_new + " " + video_name)
 
             set_name_old = set_name_new

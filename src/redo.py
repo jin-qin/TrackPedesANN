@@ -87,20 +87,9 @@ import numpy as np
 import sys
 import os
 import visualizer
-from py_faster_rcnn.tools.detect_pedestrians import detect_objects
-print detect_objects(img)  # Caffe will occupy GPU, then tensorflow cannot use.
 
-def detect_objects(imgs_path):
-    """
-    This function can only be used before start tensorflow!!!
-    :param imgs_path: The path of image
-    :return: detected results
-    """
-    os.system("python py_faster_rcnn/tools/detect_pedestrians.py -path "+imgs_path)
-    detected_results=np.load('detected_results.npy')
-    return detected_results
 
-print detect_objects('py_faster_rcnn/data/demo/004545.jpg')
+#print detect_objects('py_faster_rcnn/data/demo/004545.jpg')
 ###############################################################
 ############# Parameter Tuning Part 1  ### ####################
 ###############################################################

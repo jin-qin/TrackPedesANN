@@ -7,6 +7,7 @@ import os
 import cv2 as cv
 import random
 import string
+from py_faster_rcnn.tools.detect_pedestrians import *
 
 class ConvolutionalNetwork:
     def __init__(self, calLoader,
@@ -47,6 +48,7 @@ class ConvolutionalNetwork:
         self.accuracy_weight_distance = accuracy_weight_distance
         self.accuracy_weight_direction = accuracy_weight_direction
         self.max_batch_size = max_batch_size
+        self.rcnn = None
 
         # create session name that is (in the best case) unique. this name will be used for file names etc.
         # => timestamp, underscore, 3 random letters
@@ -680,7 +682,7 @@ class ConvolutionalNetwork:
     # ped_pos_init[frame_index][ped_index] = [x,y,width,height]
     #   [x,y] are the supposed coordinates of the pedestrian's head. The head's relative position to a bounding box of
     #   width x height pixels is determined by self.head_rel_pos_prev_row and self.head_rel_pos_prev_col.
-    def live_tracking_video(self, frames, ped_pos_init, visualize_file_name=None):
+    def live_tracking_video(self, frames, ped_pos_init, visualize_file_name=None, update_rcnn_frames=0):
 
         log.log("tracking {} frames".format(len(frames)))
 
@@ -705,6 +707,16 @@ class ConvolutionalNetwork:
                 ped_pos_init.append([])
 
             if frame_index > 0:
+
+                # if rcnn is activated, use it to correct current tracking
+                # TODO make it parallel
+                if update_rcnn_frames > 0 and frame_index % update_rcnn_frames == 1:
+                    ped_pos_init[frame_index - 1] = []
+                    temp1, boundingBoxes, temp2 = self.rcnn_detect_objects(frame_prev,self.getRcnn())  # Caffe will occupy GPU, then tensorflow cannot use.
+                    for box in boundingBoxes:
+                        width = box[2] - box[0]
+                        height = box[2] - box[0]
+                        ped_pos_init.append( [box[0], box[1], width, height] )
 
                 log.log("tracking in frame {}".format(frame_index + 1))
 
@@ -853,3 +865,22 @@ class ConvolutionalNetwork:
         predictions = self.session.run(self.position_predicted_2D, feed_dict)
 
         return predictions
+
+    def getRcnn(self):
+
+        if self.rcnn is None:
+            self.rcnn = setup_model()
+
+        return self.rcnn
+
+
+
+    def rcnn_detect_objects(self, imgs_path):
+        """
+        This function can only be used before start tensorflow!!!
+        :param imgs_path: The path of image
+        :return: detected results
+        """
+        os.system("python py_faster_rcnn/tools/detect_pedestrians.py -path " + imgs_path)
+        detected_results = np.load('detected_results.npy')
+        return detected_results

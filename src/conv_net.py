@@ -142,23 +142,6 @@ class ConvolutionalNetwork:
                 summary_writer.add_summary(summary_str, step)
                 summary_writer.flush()
 
-            if loss_value < self.best_loss_so_far:
-                self.best_model_save_file = os.path.join(self.log_dir,
-                                                         self.session_name + "-tf-checkpoint-loss_{}".format(
-                                                             loss_value))
-                self.best_loss_so_far = loss_value
-                self.iterations_since_best_found = 0
-                log.log("Updated best model to {} (Loss Value: {})".format(self.best_model_save_file,
-                                                                           self.best_loss_so_far))
-            else:
-                self.iterations_since_best_found += 1
-
-            #################################################################
-            # Uncomment to restore best model if X iterations pass
-            # if self.iterations_since_best_found > 100:
-            #     self.iterations_since_best_found = 0
-            #     self.saver.restore(self.session, self.best_model_save_file)
-            #################################################################
 
             # print current accuracies less often (sometimes in between and at the end)
             # + save checkpoint
@@ -167,6 +150,24 @@ class ConvolutionalNetwork:
                 log.log("Saving checkpoint..")
                 self.saver.save(self.session, os.path.join(self.log_dir, self.session_name + "-tf-checkpoint-loss_{}".format(loss_value)), global_step=step)
 
+                if loss_value < self.best_loss_so_far:
+                    self.best_model_save_file = os.path.join(self.log_dir,
+                                                             self.session_name + "-tf-checkpoint-loss_{}".format(
+                                                                 loss_value))
+                    self.best_loss_so_far = loss_value
+                    self.iterations_since_best_found = 0
+                    log.log("Updated best model to {} (Loss Value: {})".format(self.best_model_save_file,
+                                                                               self.best_loss_so_far))
+                else:
+                    self.iterations_since_best_found += 1
+
+                #################################################################
+                # Uncomment to restore best model if X iterations pass
+                # if self.iterations_since_best_found > 100:
+                #     self.iterations_since_best_found = 0
+                #     self.saver.restore(self.session, self.best_model_save_file)
+                #################################################################
+                
                 # don't print in last run as this will be done anyway
                 if (step + 1) != self.iterations:
                     log.log("Updated accuracies after {}/{} iterations:".format((step + 1), self.iterations))

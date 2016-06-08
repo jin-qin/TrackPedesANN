@@ -315,7 +315,6 @@ class CaltechLoader:
     def wrapImage(self, img):
 
         # convert image to grayscale
-        # TODO check that used images are in BGR and not RGB
         gray_image = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
 
         # calc gradients
@@ -329,10 +328,9 @@ class CaltechLoader:
         sobely_8u = np.uint8(abs_sobely64f)
 
         # put everything together
-        # TODO now we are using RGB instead of BGR, that doesn't fit together.. see above
         # TODO in live_tracking_frame() we use another method for the same intention, check which one is better and use only one
         red, green, blue = self.split_into_rgb_channels(img)
-        inputSample = np.array([red, green, blue, sobelx_8u, sobely_8u], dtype=np.float16)
+        inputSample = np.array([blue, green, red, sobelx_8u, sobely_8u], dtype=np.float16)
 
         inputSample = np.swapaxes(inputSample, 0, 2)
         inputSample = np.swapaxes(inputSample, 0, 1)

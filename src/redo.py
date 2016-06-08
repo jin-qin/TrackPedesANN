@@ -17,7 +17,8 @@ How to run:
     + one extracted archive containing test data (set06 - set10)
 
 Other nodes:
-- images are stored in opencv shape [height, width]
+- images are stored in opencv shape [height, width] (+ channels)
+- the channels are also stored in opencv style: BGR instead of rgb!
 - BUT single coordinates are stored as provided in the caltech dataset => [x,y] (cv would be [y,x] = [row,col])
 '''
 
@@ -46,7 +47,7 @@ cfc_cache_dataset_hdd = True # reminder: if this is turned on, and you want to c
 cf_timeout_minutes = 0 # maximum number of minutes used for training. 0=unlimited
 cf_log_auto_save = True #if True, the log file will be saved automatically as soon as all calculations have been finished correctly
 cf_log_dir = cf_log_dir_init = "logs"
-cfc_datasetpath_init = "./data" # path to the (Caltech) dataset. Can be overriden by commandline parameter.
+cfc_datasetpath_init = "media/th/6C4C-2ECD/ml_datasets" # path to the (Caltech) dataset. Can be overriden by commandline parameter.
 cf_max_batch_size = 250 # maximum number of samples that will be processed at once. Set to None for now limit on high-end computers. otherwise decrease for less memory requirements
 
 # relative horizontale position assumed for the pedestrians head in the previous frame.

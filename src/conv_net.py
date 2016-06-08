@@ -7,7 +7,7 @@ import os
 import cv2 as cv
 import random
 import string
-from py_faster_rcnn.tools.detect_pedestrians import *
+#from py_faster_rcnn.tools.detect_pedestrians import *
 
 class ConvolutionalNetwork:
     def __init__(self, calLoader,
@@ -506,7 +506,8 @@ class ConvolutionalNetwork:
         self.session.run(init)
 
         if saved_model is not None:
-            self.saver.restore(self.session, saved_model)
+            self.saver.restore(self.session, os.path.join(self.log_dir, saved_model))
+            self.session.run(global_step.assign(0))
 
         ## accuracy Begin ###
 

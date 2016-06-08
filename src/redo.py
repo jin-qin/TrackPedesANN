@@ -27,7 +27,7 @@ Other nodes:
 
 # general
 cf_max_samples = 0 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
-cf_num_iters = 1000
+cf_num_iters = 10000
 cf_batch_size = 128
 cf_validation_set_size = int(round(cf_max_samples * 0.1)) # this absolute number of images will be taken from the training images and used as validation data
 cf_min_max_scaling = True #turn on either this or cf_standardization
@@ -234,7 +234,7 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
                                    cf_accuracy_weight_distance,
                                    cf_learning_rate_min,
                                    cf_max_batch_size,
-                                   saved_model=None)  # Change None to path to checkpoint
+                                   saved_model='super.awesome')  # Change None to path to checkpoint
 
     # Training
     log.log('Start Training..')

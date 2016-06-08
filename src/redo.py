@@ -47,7 +47,7 @@ cfc_cache_dataset_hdd = True # reminder: if this is turned on, and you want to c
 cf_timeout_minutes = 0 # maximum number of minutes used for training. 0=unlimited
 cf_log_auto_save = True #if True, the log file will be saved automatically as soon as all calculations have been finished correctly
 cf_log_dir = cf_log_dir_init = "logs"
-cfc_datasetpath_init = "media/th/6C4C-2ECD/ml_datasets" # path to the (Caltech) dataset. Can be overriden by commandline parameter.
+cfc_datasetpath_init = "/media/th/6C4C-2ECD/ml_datasets" # path to the (Caltech) dataset. Can be overriden by commandline parameter.
 cf_max_batch_size = 250 # maximum number of samples that will be processed at once. Set to None for now limit on high-end computers. otherwise decrease for less memory requirements
 
 # relative horizontale position assumed for the pedestrians head in the previous frame.
@@ -67,6 +67,9 @@ cf_image_size_min_resize = int(round(48 * 1.25))
 cf_dataset = 0
 
 cf_accuracy_weight_distance = 1 - cf_accuracy_weight_direction
+
+if cf_validation_set_size <= 0:
+    cf_validation_set_size = 1000
 
 # validation set needs at least as much images as included in one batch in order to allow accuracy evaluation
 #cf_validation_set_size = max(cf_validation_set_size, cf_batch_size)

@@ -50,6 +50,11 @@ class ConvolutionalNetwork:
         self.max_batch_size = max_batch_size
         self.rcnn = None
 
+        # Samuel: Keeping Best Results
+        self.best_loss_so_far = 1000.0  # Arbitrarily Big
+        self.best_model_save_file = None
+        self.iterations_since_best_found = 0
+
         # create session name that is (in the best case) unique. this name will be used for file names etc.
         # => timestamp, underscore, 3 random letters
         self.session_name = "{}_".format( time.time()) + random.choice(string.ascii_letters) + random.choice(string.ascii_letters) + random.choice(string.ascii_letters)
@@ -136,6 +141,24 @@ class ConvolutionalNetwork:
                 summary_str = self.session.run(self.summary_op, feed_dict=feed_dict)
                 summary_writer.add_summary(summary_str, step)
                 summary_writer.flush()
+
+            if loss_value < self.best_loss_so_far:
+                self.best_model_save_file = os.path.join(self.log_dir,
+                                                         self.session_name + "-tf-checkpoint-loss_{}".format(
+                                                             loss_value))
+                self.best_loss_so_far = loss_value
+                self.iterations_since_best_found = 0
+                log.log("Updated best model to {} (Loss Value: {})".format(self.best_model_save_file,
+                                                                           self.best_loss_so_far))
+            else:
+                self.iterations_since_best_found += 1
+
+            #################################################################
+            # Uncomment to restore best model if X iterations pass
+            # if self.iterations_since_best_found > 100:
+            #     self.iterations_since_best_found = 0
+            #     self.saver.restore(self.session, self.best_model_save_file)
+            #################################################################
 
             # print current accuracies less often (sometimes in between and at the end)
             # + save checkpoint
@@ -649,6 +672,9 @@ class ConvolutionalNetwork:
     def final_evaluation(self):
 
         log.log("starting final evaluation")
+        # Reset weights to best model so far
+        self.saver.restore(self.session, self.best_model_save_file)
+        log.log("Loading best model ({})".format(self.best_model_save_file))
 
         # if not already done, load test data
         log.log("No testset available yet, start loading it..")

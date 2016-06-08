@@ -379,9 +379,8 @@ class CaltechLoader:
 
                         # pedestrians face is supposed to be at the center of the given rectangle
                         img_ped = img_curr[y:y + h, x:x + w]
-
-
                         img_ped_prev = img_prev[y:y + h, x:x + w]
+
 
                         w_real = len(img_ped[0])
                         h_real = len(img_ped)
@@ -430,8 +429,9 @@ class CaltechLoader:
                                 cv.imshow('ped prev', img_ped_prev)
                                 cv.imshow('frame current', img_curr)
                                 cv.imshow('ped current', img_ped)
-                                cv.imshow('probability map', probs)
-                                vis.visualizeProbabilityMap(img_test)
+                                #cv.imshow('probability map', probs)
+                                # cv.imshow('probability map', img_test)
+                                vis.visualizeProbabilityMap(probs)
 
                             #self.save_img(set_name, video_name, frame_i, img_ped)
 

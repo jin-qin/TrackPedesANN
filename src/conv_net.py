@@ -480,10 +480,9 @@ class ConvolutionalNetwork:
         # the (supposed) position of a pedestrian's head will always be the same for all PREVIOUS frames
         # => once prepare same value for one batch size, so we can use this during training
         # => update: instead of copying the same value, we just use an array with shape [1,2] which will be broadcasted
-        # TODO x and y correct order? especially compare data in caltech and the loader
         row = int(round(self.output_height * self.head_rel_pos_prev_row))
         col = int(round(self.output_width * self.head_rel_pos_prev_col))
-        self.position_previous_2D_batch = np.array([[col, row]])
+        self.position_previous_2D_batch = np.array([[col, row]]) # two brackets => shape [1,2]. col, row = x,y
 
         self.position_predicted_2D = self.get_target_position(self.scoresFlattened)
         position_real_2D = self.get_target_position(self.targetProbsFlattened)
@@ -726,11 +725,11 @@ class ConvolutionalNetwork:
                         ped_pos_init[frame_index] = ped_pos_predicted
 
 
-
                 # visualize results
                 if not visualize_file_name is None:
                     for ped_pos in ped_pos_predicted:
                         x, y, w, h = [int(v) for v in ped_pos]
+                        x, y, w, h = self.headToCorner([x, y, w, h])
                         cv.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 1)
 
                     wri.write(frame)
@@ -745,6 +744,27 @@ class ConvolutionalNetwork:
 
     def valid_coordinates(self, x, y, image):
         return x >= 0 and y >= 0 and y < image.shape[0] and x < image.shape[1]
+
+
+    # transform head position to top left corner
+    # head = [x,y,w,h]
+    def headToCorner(self, head):
+        w = head[2]
+        h = head[3]
+        corner_x = head[0] - int(round(self.head_rel_pos_prev_col * w))
+        corner_y = head[1] - int(round(self.head_rel_pos_prev_row * h))
+
+        return [corner_x, corner_y, w, h]
+
+    # transform top left corner to head position
+    # upperLeftCorner = [x,y,w,h]
+    def cornerToHead(self, upperLeftCorner):
+        w = upperLeftCorner[2]
+        h = upperLeftCorner[3]
+        head_x = upperLeftCorner[0] + int(round(self.head_rel_pos_prev_col * w))
+        head_y = upperLeftCorner[1] + int(round(self.head_rel_pos_prev_row * h))
+
+        return [head_x, head_y, w, h]
 
     # track one or multiple pedestrians in a single frame.
     # => predict their position in the (unknown) next frame
@@ -773,8 +793,7 @@ class ConvolutionalNetwork:
             for ped_pos in ped_pos_prev:
 
                 # transform head position to top left corner
-                corner_x = ped_pos[0] - int(round(self.head_rel_pos_prev_col * ped_pos[2]))
-                corner_y = ped_pos[1] - int(round(self.head_rel_pos_prev_row * ped_pos[3]))
+                corner_x, corner_y, temp1, temp2 = self.headToCorner(ped_pos)
 
                 # other required corners
                 other_corner_x = corner_x + ped_pos[2]

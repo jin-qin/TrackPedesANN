@@ -9,8 +9,8 @@ class Visualizer:
 
     def visualizeProbabilityMap(self, map):
         #vis2 = cv2.cvtColor(map, cv2.COLOR_GRAY2BGR)
-
-        cv2.imshow('dst_rt', map)
+        im_color = cv2.applyColorMap(map, cv2.COLORMAP_BONE) #COLORMAP_BONE
+        cv2.imshow('probability map colored', im_color)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
@@ -57,6 +57,10 @@ class Visualizer:
                         ped_id = data['id']
 
                         if not ped_id in ped_keys:
+
+                            # convert upper left corner to head position
+                            data['pos'] = net.cornerToHead(data['pos'])
+
                             frame_pos.append(data['pos'])
                             ped_keys.append(ped_id)
 

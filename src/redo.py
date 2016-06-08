@@ -17,7 +17,8 @@ How to run:
     + one extracted archive containing test data (set06 - set10)
 
 Other nodes:
-- images are stored in opencv shape [height, width]
+- images are stored in opencv shape [height, width] (+ channels)
+- the channels are also stored in opencv style: BGR instead of rgb!
 - BUT single coordinates are stored as provided in the caltech dataset => [x,y] (cv would be [y,x] = [row,col])
 '''
 
@@ -66,6 +67,9 @@ cf_image_size_min_resize = int(round(48 * 1.25))
 cf_dataset = 0
 
 cf_accuracy_weight_distance = 1 - cf_accuracy_weight_direction
+
+if cf_validation_set_size <= 0:
+    cf_validation_set_size = 1000
 
 # validation set needs at least as much images as included in one batch in order to allow accuracy evaluation
 #cf_validation_set_size = max(cf_validation_set_size, cf_batch_size)
@@ -117,10 +121,10 @@ param_test_cf_image_size_min_resize = [
     "cf_image_size_min_resize",  # string name
     [48 * 0.5, 48 * 0.75, 48, 48 * 1.2, 48 * 1.5, 48 * 2]]  # values
 param_test_cf_image_size_min_resize = [
-    "cf_min_max_scaling",  # TODO CLEAN CACHE AFTER EACH ITERATION (of this parameter)!!
+    "cf_min_max_scaling",  # CLEAN CACHE AFTER EACH ITERATION (of this parameter)!!
     [True, False]]  # values
 param_test_cf_standardization = [
-    "cf_standardization",  # TODO CLEAN CACHE AFTER EACH ITERATION (of this parameter)!!
+    "cf_standardization",  # CLEAN CACHE AFTER EACH ITERATION (of this parameter)!!
     [True, False]]  # values
 
 
@@ -168,7 +172,6 @@ eval_i_max = len(testvals[1])
 i=0
 while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside the loop
 
-    #try: #TODO
 
     # Loading data
     log.log('###############################################################')
@@ -281,9 +284,5 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
         visualizer.visualizeTestVideos(net, calLoader)
 
     redo_finalize(cf_log_auto_save)
-
-    #except Exception as e:  #TODO
-    #    log.log("crash detected. auto repairing.. redo.. " + e.message)
-    #    i -= 1 # on error: redo this iteration
 
     i += 1

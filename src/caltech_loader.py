@@ -8,6 +8,7 @@ import cPickle as pickle
 import log
 import preprocessor as pp
 import visualizer as vs
+import tensorflow as tf
 
 class CaltechLoader:
 
@@ -162,9 +163,11 @@ class CaltechLoader:
 
                 if len(files) > 0:
 
+                    results[set_name] = defaultdict(dict)
+
                     for fn in files:
                         video_name = os.path.splitext(os.path.basename(fn))[0]
-                        results[video_name] = fn
+                        results[set_name][video_name] = fn
 
 
         return results
@@ -183,43 +186,44 @@ class CaltechLoader:
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-        videos = self.get_video_file_names(training)
+        video_sets = self.get_video_file_names(training)
 
         x_prev, x_curr, y = [], [], []
 
-        if len(videos) > 0:
+        if len(video_sets) > 0:
 
-            for video_name, fn in videos.iteritems():
+            for set_name, videos in video_sets.iteritems():
+                for video_name, fn in videos.iteritems():
 
-                temp, set_name = os.path.split(os.path.split(fn)[0])
+                    #temp, set_name = os.path.split(os.path.split(fn)[0])
 
-                log.log("Processing video {} of {}".format(video_name, set_name))
+                    log.log("Processing video {} of {}".format(video_name, set_name))
 
-                cap = cv.VideoCapture(fn)
-                previousFrame = None
-                i = 0
-                while True:
-                    ret, frame = cap.read()
-                    if not ret:
+                    cap = cv.VideoCapture(fn)
+                    previousFrame = None
+                    i = 0
+                    while True:
+                        ret, frame = cap.read()
+                        if not ret:
+                            break
+
+                        if i > 0:
+                            self.extractPedestriansFromImage(previousFrame, frame, set_name, video_name, i, x_prev, x_curr, y)
+
+                        # save original raw image on disk?
+                        #self.save_img(dname, fn, i, frame)
+
+                        previousFrame = frame
+                        i += 1
+
+
+                    # after all frames of this video have been preprocessed, we can start creating pairs
+                    log.log("Number of created sample pairs: {}".format(len(x_prev)))
+
+                    # allow only max self.maxSamples pairs for speed up (during development)
+                    if self.maxSamples > 0 and len(x_prev) > self.maxSamples:
+                        log.log("FORCE STOP of dataset loading as the maximum number of samples has been reached");
                         break
-
-                    if i > 0:
-                        self.extractPedestriansFromImage(previousFrame, frame, set_name, video_name, i, x_prev, x_curr, y)
-
-                    # save original raw image on disk?
-                    #self.save_img(dname, fn, i, frame)
-
-                    previousFrame = frame
-                    i += 1
-
-
-                # after all frames of this video have been preprocessed, we can start creating pairs
-                log.log("Number of created sample pairs: {}".format(len(x_prev)))
-
-                # allow only max self.maxSamples pairs for speed up (during development)
-                if self.maxSamples > 0 and len(x_prev) > self.maxSamples:
-                    log.log("FORCE STOP of dataset loading as the maximum number of samples has been reached");
-                    break
 
 
             log.log("Finished frame extraction and matching.")
@@ -234,7 +238,7 @@ class CaltechLoader:
             log.log("Finished gradient calculations.")
 
             # convert to np
-            x_prev = np.asarray(x_prev, np.float16) #TODO could int work, too? actually int is enough, but during the calcs?
+            x_prev = np.asarray(x_prev, np.float16)
             x_curr = np.asarray(x_curr, np.float16)
             y = np.asarray(y, np.float16)
 
@@ -258,7 +262,7 @@ class CaltechLoader:
             self.preprocessor.preprocessData([x_prev, x_curr])
 
 
-            # TODO whenever calling other instances (like live camera images in an application) they need to be preprocessed, too
+            # (whenever calling other instances (like live camera images in an application) they need to be preprocessed, too)
 
 
             # datasets are ready! rename and save..
@@ -299,8 +303,6 @@ class CaltechLoader:
 
 
 
-
-
     def split_into_rgb_channels(self, image):
         '''Split the target image into its red, green and blue channels.
         image - a numpy array of shape (rows, columns, 3).
@@ -315,7 +317,6 @@ class CaltechLoader:
     def wrapImage(self, img):
 
         # convert image to grayscale
-        # TODO check that used images are in BGR and not RGB
         gray_image = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
 
         # calc gradients
@@ -329,10 +330,8 @@ class CaltechLoader:
         sobely_8u = np.uint8(abs_sobely64f)
 
         # put everything together
-        # TODO now we are using RGB instead of BGR, that doesn't fit together.. see above
-        # TODO in live_tracking_frame() we use another method for the same intention, check which one is better and use only one
         red, green, blue = self.split_into_rgb_channels(img)
-        inputSample = np.array([red, green, blue, sobelx_8u, sobely_8u], dtype=np.float16) #TODO could int work, too? actually int is enough, but during the calcs?
+        inputSample = np.array([blue, green, red, sobelx_8u, sobely_8u], dtype=np.float16)
 
         inputSample = np.swapaxes(inputSample, 0, 2)
         inputSample = np.swapaxes(inputSample, 0, 1)
@@ -381,18 +380,15 @@ class CaltechLoader:
                     if ped_exists_in_prev_frame:
 
                         # pedestrians face is supposed to be at the center of the given rectangle
-                        # TODO or do we need to normalize the images to set the face to a specific position??
                         img_ped = img_curr[y:y + h, x:x + w]
-
-
                         img_ped_prev = img_prev[y:y + h, x:x + w]
+
 
                         w_real = len(img_ped[0])
                         h_real = len(img_ped)
                         if not(w_real < self.image_size_min_resize or h_real < self.image_size_min_resize):
 
                             # resize all images
-                            # TODO check how to resize probably for different-ratio image patches
                             resized_image = cv.resize(img_ped, (self.image_width, self.image_height))
 
                             resized_image_prev = cv.resize(img_ped_prev, (self.image_width, self.image_height))
@@ -408,7 +404,6 @@ class CaltechLoader:
                             # but as we choose the image patch based on the previous and not the current frame,
                             # the relative position is not guaranteed to be in the center. Calculate the relative
                             # position and use it to generate a target probability map.
-                            # TODO check whether there is a better target position given in the caltech metadata
                             absolute_center_x = x + (w * self.head_rel_pos_prev_col)
                             absolute_center_y = y + (h * self.head_rel_pos_prev_row) #not center, but upper quarter
                             relative_center_x = absolute_center_x - x_prev
@@ -436,8 +431,9 @@ class CaltechLoader:
                                 cv.imshow('ped prev', img_ped_prev)
                                 cv.imshow('frame current', img_curr)
                                 cv.imshow('ped current', img_ped)
-                                cv.imshow('probability map', probs)
-                                vis.visualizeProbabilityMap(img_test)
+                                #cv.imshow('probability map', probs)
+                                # cv.imshow('probability map', img_test)
+                                vis.visualizeProbabilityMap(probs)
 
                             #self.save_img(set_name, video_name, frame_i, img_ped)
 
@@ -467,7 +463,7 @@ class CaltechLoader:
     def calcTargetProbMap(self, center_x, center_y):
 
         # calculate target probability maps
-        sigma = 0.5
+        sigma = 1
         sigma_square = sigma * sigma
         scores = np.zeros([64,24])
         for x in range(24):
@@ -475,8 +471,7 @@ class CaltechLoader:
                 scores[y][x] = np.exp(-( np.square(x - center_x) + np.square(y - center_y)) / (2 * sigma_square))
 
         # use softmax to allow probability interpretations
-        # TODO for some reason softmax is not returning reasonable results right now. fix it and turn it on again
-        #(that's why currently tensorflows softmax is applied to Y,too)
+        # Update: we do this in tensorflow
         #probs = self.softmax(scores)
 
         return scores

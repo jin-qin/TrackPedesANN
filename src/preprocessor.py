@@ -17,8 +17,6 @@ class Preprocessor:
             self.preprocessInit(min_max_scaling, standardization,
                                 data)  # call this independently of the values of min_max_scaling or standardization!
 
-            #TODO those learned parameters needs to be saved with the network
-
             log.log(".. preprocessing initialized")
 
 

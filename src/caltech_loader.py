@@ -8,6 +8,7 @@ import cPickle as pickle
 import log
 import preprocessor as pp
 import visualizer as vs
+import tensorflow as tf
 
 class CaltechLoader:
 
@@ -162,9 +163,11 @@ class CaltechLoader:
 
                 if len(files) > 0:
 
+                    results[set_name] = defaultdict(dict)
+
                     for fn in files:
                         video_name = os.path.splitext(os.path.basename(fn))[0]
-                        results[video_name] = fn
+                        results[set_name][video_name] = fn
 
 
         return results
@@ -183,43 +186,44 @@ class CaltechLoader:
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-        videos = self.get_video_file_names(training)
+        video_sets = self.get_video_file_names(training)
 
         x_prev, x_curr, y = [], [], []
 
-        if len(videos) > 0:
+        if len(video_sets) > 0:
 
-            for video_name, fn in videos.iteritems():
+            for set_name, videos in video_sets.iteritems():
+                for video_name, fn in videos.iteritems():
 
-                temp, set_name = os.path.split(os.path.split(fn)[0])
+                    #temp, set_name = os.path.split(os.path.split(fn)[0])
 
-                log.log("Processing video {} of {}".format(video_name, set_name))
+                    log.log("Processing video {} of {}".format(video_name, set_name))
 
-                cap = cv.VideoCapture(fn)
-                previousFrame = None
-                i = 0
-                while True:
-                    ret, frame = cap.read()
-                    if not ret:
+                    cap = cv.VideoCapture(fn)
+                    previousFrame = None
+                    i = 0
+                    while True:
+                        ret, frame = cap.read()
+                        if not ret:
+                            break
+
+                        if i > 0:
+                            self.extractPedestriansFromImage(previousFrame, frame, set_name, video_name, i, x_prev, x_curr, y)
+
+                        # save original raw image on disk?
+                        #self.save_img(dname, fn, i, frame)
+
+                        previousFrame = frame
+                        i += 1
+
+
+                    # after all frames of this video have been preprocessed, we can start creating pairs
+                    log.log("Number of created sample pairs: {}".format(len(x_prev)))
+
+                    # allow only max self.maxSamples pairs for speed up (during development)
+                    if self.maxSamples > 0 and len(x_prev) > self.maxSamples:
+                        log.log("FORCE STOP of dataset loading as the maximum number of samples has been reached");
                         break
-
-                    if i > 0:
-                        self.extractPedestriansFromImage(previousFrame, frame, set_name, video_name, i, x_prev, x_curr, y)
-
-                    # save original raw image on disk?
-                    #self.save_img(dname, fn, i, frame)
-
-                    previousFrame = frame
-                    i += 1
-
-
-                # after all frames of this video have been preprocessed, we can start creating pairs
-                log.log("Number of created sample pairs: {}".format(len(x_prev)))
-
-                # allow only max self.maxSamples pairs for speed up (during development)
-                if self.maxSamples > 0 and len(x_prev) > self.maxSamples:
-                    log.log("FORCE STOP of dataset loading as the maximum number of samples has been reached");
-                    break
 
 
             log.log("Finished frame extraction and matching.")
@@ -296,8 +300,6 @@ class CaltechLoader:
                     log.log("saving test data to file")
                     pickle.dump([self.testSamplesPrevious, self.testSamplesCurrent, self.testY],
                                 open(os.path.join(self.output_dir, name), "wb"))
-
-
 
 
 

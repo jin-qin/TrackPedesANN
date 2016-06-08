@@ -19,56 +19,53 @@ class Visualizer:
 
         log.log("Starting visualized testset videos..")
 
-        videos = calLoader.get_video_file_names(False)
+        video_sets = calLoader.get_video_file_names(False)
 
-        set_name_old = ""
-        for video_name, video in videos.iteritems():
+        for set_name, videos in video_sets.iteritems():
 
-            frames = []
-            ped_pos_init = []
+            log.log("Processing set {}".format(set_name))
 
-            # each pedestrian has an unique id. each id/pedestrian will be processed only a single time.
-            ped_keys = []
+            for video_name, video in videos.iteritems():
 
-            temp, set_name_new = os.path.split(os.path.split(video)[0])
-            if set_name_new != set_name_old:
-                log.log("Processing set {}".format(set_name_new))
+                frames = []
+                ped_pos_init = []
 
-            log.log("Processing video {}".format(video_name))
+                # each pedestrian has an unique id. each id/pedestrian will be processed only a single time.
+                ped_keys = []
 
-            # read video frame by frame
-            cap = cv2.VideoCapture(video)
-            while True:
-                ret, frame = cap.read()
+                log.log("Processing video {}".format(video_name))
 
-                if not ret:
-                    break
+                # read video frame by frame
+                cap = cv2.VideoCapture(video)
+                while True:
+                    ret, frame = cap.read()
 
-                frames.append(frame)
+                    if not ret:
+                        break
 
-            annotations = calLoader.get_annotations()
-            vid_frames = annotations[set_name_new][video_name]['frames']
-            if not vid_frames is None:
-                for vid_i, vid_frame in vid_frames.iteritems():
+                    frames.append(frame)
 
-                    frame_pos = []
+                annotations = calLoader.get_annotations()
+                vid_frames = annotations[set_name][video_name]['frames']
+                if not vid_frames is None:
+                    for vid_i, vid_frame in vid_frames.iteritems():
 
-                    for data in vid_frame:
-                        ped_id = data['id']
+                        frame_pos = []
 
-                        if not ped_id in ped_keys:
+                        for data in vid_frame:
+                            ped_id = data['id']
 
-                            # convert upper left corner to head position
-                            data['pos'] = net.cornerToHead(data['pos'])
+                            if not ped_id in ped_keys:
 
-                            frame_pos.append(data['pos'])
-                            ped_keys.append(ped_id)
+                                # convert upper left corner to head position
+                                data['pos'] = net.cornerToHead(data['pos'])
 
-                    ped_pos_init.append(frame_pos)
+                                frame_pos.append(data['pos'])
+                                ped_keys.append(ped_id)
 
-            # actual tracking + saving results in file
-            log.log("Start live tracking: " + set_name_new + " " + video_name)
-            net.live_tracking_video(frames, ped_pos_init, net.get_session_name() + "-" + set_name_new + "_" + video_name, 10)
-            log.log("Finished live tracking: " + set_name_new + " " + video_name)
+                        ped_pos_init.append(frame_pos)
 
-            set_name_old = set_name_new
+                # actual tracking + saving results in file
+                log.log("Start live tracking: " + set_name + " " + video_name)
+                net.live_tracking_video(frames, ped_pos_init, net.get_session_name() + "-" + set_name + "_" + video_name, 10)
+                log.log("Finished live tracking: " + set_name + " " + video_name)

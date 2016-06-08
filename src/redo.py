@@ -26,7 +26,7 @@ Other nodes:
 ###############################################################
 
 # general
-cf_max_samples = 0 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
+cf_max_samples = 20000 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
 cf_num_iters = 10000
 cf_batch_size = 128
 cf_validation_set_size = int(round(cf_max_samples * 0.1)) # this absolute number of images will be taken from the training images and used as validation data

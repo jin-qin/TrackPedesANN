@@ -51,7 +51,7 @@ class ConvolutionalNetwork:
         self.rcnn = None
 
         # Samuel: Keeping Best Results
-        self.best_loss_so_far = 1000.0  # Arbitrarily Big
+        self.best_value_so_far = 1000.0  # Arbitrarily Big
         self.best_model_save_file = None
         self.iterations_since_best_found = 0
 
@@ -150,14 +150,23 @@ class ConvolutionalNetwork:
                 log.log("Saving checkpoint..")
                 self.saver.save(self.session, os.path.join(self.log_dir, self.session_name + "-tf-checkpoint-loss_{}".format(loss_value)), global_step=step)
 
-                if loss_value < self.best_loss_so_far:
+
+                # don't print in last run as this will be done anyway
+                if (step + 1) != self.iterations:
+                    log.log("Updated accuracies after {}/{} iterations:".format((step + 1), self.iterations))
+
+                    # 1/3: validation data
+                    acc_val = self.accuracy(self.XvalPrevious, self.XvalCurrent, self.Yval)
+                    log.log(" - validation: {0:.3f}%".format(acc_val * 100))
+
+                if loss_value < self.best_value_so_far: # Change to loss_value > self.best_value_so_far if you prefer using accuracy instead of loss
                     self.best_model_save_file = os.path.join(self.log_dir,
                                                              self.session_name + "-tf-checkpoint-loss_{}".format(
                                                                  loss_value))
-                    self.best_loss_so_far = loss_value
+                    self.best_value_so_far = loss_value  # Change to self.best_value_so_far = acc_val if you prefer using accuracy instead of loss
                     self.iterations_since_best_found = 0
                     log.log("Updated best model to {} (Loss Value: {})".format(self.best_model_save_file,
-                                                                               self.best_loss_so_far))
+                                                                               self.best_value_so_far))
                 else:
                     self.iterations_since_best_found += 1
 
@@ -167,14 +176,6 @@ class ConvolutionalNetwork:
                 #     self.iterations_since_best_found = 0
                 #     self.saver.restore(self.session, self.best_model_save_file)
                 #################################################################
-                
-                # don't print in last run as this will be done anyway
-                if (step + 1) != self.iterations:
-                    log.log("Updated accuracies after {}/{} iterations:".format((step + 1), self.iterations))
-
-                    # 1/3: validation data
-                    acc_val = self.accuracy(self.XvalPrevious, self.XvalCurrent, self.Yval)
-                    log.log(" - validation: {0:.3f}%".format(acc_val * 100))
 
             if (step + 1) % interrupt_every_x_steps_late == 0 and (step + 1) != self.iterations: #don't print in last run as this will be done anyway
 

@@ -461,7 +461,7 @@ class CaltechLoader:
     def calcTargetProbMap(self, center_x, center_y):
 
         # calculate target probability maps
-        sigma = 0.5
+        sigma = 1
         sigma_square = sigma * sigma
         scores = np.zeros([64,24])
         for x in range(24):

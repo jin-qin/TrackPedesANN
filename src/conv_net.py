@@ -165,7 +165,7 @@ class ConvolutionalNetwork:
                                                                  loss_value))
                     self.best_value_so_far = loss_value  # Change to self.best_value_so_far = acc_val if you prefer using accuracy instead of loss
                     self.iterations_since_best_found = 0
-                    log.log("Updated best model to {} (Loss Value: {})".format(self.best_model_save_file,
+                    log.log("Updated best model to {} (Best Value: {})".format(self.best_model_save_file,
                                                                                self.best_value_so_far))
                 else:
                     self.iterations_since_best_found += 1

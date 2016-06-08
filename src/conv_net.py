@@ -107,6 +107,8 @@ class ConvolutionalNetwork:
         # runtime evaluation
         self.runtime_training_start = time.time()
 
+
+
         # allow saving results to file
         summary_writer = tf.train.SummaryWriter(os.path.join(self.log_dir, self.session_name + "-tf-summary"), self.session.graph)
 
@@ -513,8 +515,6 @@ class ConvolutionalNetwork:
     # keep in mind: (not needed for accuracy, but for "real" tracking:)
     # scale is still 0.5, so we need to multiply by 2
     def get_target_position(self, probs_1d):
-
-        # TODO does this give the correct position?
 
         position_predicted_1D = tf.reshape(tf.argmax(probs_1d, 1),tf.pack([self.batch_size, 1]))
         row = position_predicted_1D / self.output_width  # needs to be floored

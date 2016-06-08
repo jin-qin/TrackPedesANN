@@ -107,11 +107,12 @@ class ConvolutionalNetwork:
         # allow saving results to file
         summary_writer = tf.train.SummaryWriter(os.path.join(self.log_dir, self.session_name + "-tf-summary"), self.session.graph)
 
-        interrupt_every_x_steps = min(self.iterations / 2.5, 1000, 10) #TODO remove ", 10" on computer with higher performance
-        interrupt_every_x_steps_late = max(self.iterations / 4, 1)
+        interrupt_every_x_steps = min(self.iterations / 4, 1000, 10) #TODO remove ", 10" on computer with higher performance
+        interrupt_every_x_steps_late = max(self.iterations / 2, 1)
         for step in range(self.iterations):
 
             # get a batch of training samples
+            # TODO shuffle after each complete data coverage
             offset = (step * self.batch_size_training) % (self.Ytrain.shape[0] - self.batch_size_training)
             batch_data_previous = self.XtrainPrevious[offset:(offset + self.batch_size_training), :]
             batch_data_current = self.XtrainCurrent[offset:(offset + self.batch_size_training), :]

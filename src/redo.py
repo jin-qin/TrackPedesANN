@@ -26,12 +26,12 @@ Other nodes:
 ###############################################################
 
 # general
-cf_max_samples = 0 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
-cf_num_iters = 1000
+cf_max_samples = 10000 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
+cf_num_iters = 2000
 cf_batch_size = 50
 cf_validation_set_size = int(round(cf_max_samples * 0.1)) # this absolute number of images will be taken from the training images and used as validation data
-cf_min_max_scaling = True #turn on either this or cf_standardization
-cf_standardization = True #turn on either this or cf_min_max_scaling
+cf_min_max_scaling = True # change requires resetting the cache
+cf_standardization = True # change requires resetting the cache
 cf_learning_rate = 0.9
 cf_learning_rate_decay = 0.95 #1 means no decay
 cf_learning_rate_min = 0.1 * cf_learning_rate #minimum value for learning rate decay
@@ -41,7 +41,7 @@ cf_momentum = 0.9 #0 deactivates the momentum update. when activating/increasing
 cf_accuracy_weight_direction = 0.8 # weight importance of direction vs. distance in accuracy measurements (distance = 1 - direc)
 
 # make your life convenient
-cf_visualize_results = False # if true, the testset will be used to generate videos containing the predictions. Those videos will be save to disk.
+cf_visualize_results = True # if true, the testset will be used to generate videos containing the predictions. Those videos will be save to disk.
 cfc_cache_dataset_hdd = True # reminder: if this is turned on, and you want to change other settings, they might need a cache reset => clear folder
 cf_timeout_minutes = 0 # maximum number of minutes used for training. 0=unlimited
 cf_log_auto_save = True #if True, the log file will be saved automatically as soon as all calculations have been finished correctly
@@ -166,121 +166,121 @@ eval_i_max = len(testvals[1])
 i=0
 while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside the loop
 
-    #try: #TODO
+    try: #TODO
 
-    # Loading data
-    log.log('###############################################################')
-    log.log('########################  BEGIN  ##############################')
-
-
-    ############# Parameter Tuning Part 2  ### ###################
-    if(testvals[0] != ""):
-
-        log.log('DEBUG param ' + testvals[0] + " ({})".format(testvals[1][i]))
-        cf_log_dir = os.path.join(cf_log_dir_init, testvals[0]) # save param evals in extra folder
-
-        if testvals[0] == "cf_learning_rate":
-            cf_learning_rate = testvals[1][i]
-        elif testvals[0] == "cf_batch_size":
-            cf_batch_size = testvals[1][i]
-        elif testvals[0] == "cf_learning_rate_decay":
-            cf_learning_rate_decay = testvals[1][i]
-        elif testvals[0] == "cf_momentum":
-            cf_momentum = testvals[1][i]
-            cf_optimizer = 2
-        elif testvals[0] == "cf_image_size_min_resize":
-            cf_image_size_min_resize = testvals[1][i]
-        elif testvals[0] == "cf_dropout_rate":
-            cf_dropout_rate = testvals[1][i]
-        elif testvals[0] == "cf_optimizer":
-            cf_optimizer = testvals[1][i]
-        elif testvals[0] == "cf_min_max_scaling":
-            cf_min_max_scaling = testvals[1][i]
-        elif testvals[0] == "cf_standardization":
-            cf_standardization = testvals[1][i]
+        # Loading data
+        log.log('###############################################################')
+        log.log('########################  BEGIN  ##############################')
 
 
-    if len(sys.argv) == 1:
-        # use default file path
-        cfc_datasetpath = cfc_datasetpath_init
-    else:
-        #use user specified file path
-        cfc_datasetpath = sys.argv[1]
+        ############# Parameter Tuning Part 2  ### ###################
+        if(testvals[0] != ""):
 
-    # load data
-    log.log('Preparing ' + cfc_dataset_name + ' dataset..')
-    if(cf_dataset == 0):
-        calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling,
-                                     cf_standardization, cf_head_rel_pos_prev_row, cf_head_rel_pos_prev_col,
-                                     cf_validation_set_size, cf_image_size_min_resize)
+            log.log('DEBUG param ' + testvals[0] + " ({})".format(testvals[1][i]))
+            cf_log_dir = os.path.join(cf_log_dir_init, testvals[0]) # save param evals in extra folder
 
-
-    # Creating network
-    net = cnn.ConvolutionalNetwork(calLoader,
-                                   cf_batch_size,
-                                   cf_learning_rate,
-                                   cf_num_iters,
-                                   cf_learning_rate_decay,
-                                   cf_momentum,
-                                   cf_timeout_minutes,
-                                   cf_log_dir,
-                                   cf_dropout_rate,
-                                   cf_optimizer,
-                                   cf_head_rel_pos_prev_row,
-                                   cf_head_rel_pos_prev_col,
-                                   cf_accuracy_weight_direction,
-                                   cf_accuracy_weight_distance,
-                                   cf_learning_rate_min,
-                                   cf_max_batch_size)
-
-    # Training
-    log.log('Start Training..')
-    if cf_timeout_minutes  > 0:
-        log.log('.. timeout after {} minutes'.format(cf_timeout_minutes))
-    log.log('.. total number of iterations: {}'.format(cf_num_iters))
-    log.log('.. batch size in each iteration: {}'.format(cf_batch_size))
-    log.log('.. learning rate: {}'.format(cf_learning_rate))
-    log.log('.. learning rate decay: {}'.format(cf_learning_rate_decay))
-    log.log('.. learning rate minimum: {}'.format(cf_learning_rate_min))
-
-    # print optimizer
-    optimizer_name = "unknown"
-    if cf_optimizer == 0:
-        optimizer_name= "GradientDescentOptimizer"
-    elif cf_optimizer == 1:
-        optimizer_name = "AdamOptimizer"
-    elif cf_optimizer == 2:
-        optimizer_name = "MomentumOptimizer"
-    log.log('.. optimizer: {}'.format(optimizer_name))
-
-    if cf_optimizer == 2:
-        log.log('.. momentum update: {}'.format(cf_momentum))
+            if testvals[0] == "cf_learning_rate":
+                cf_learning_rate = testvals[1][i]
+            elif testvals[0] == "cf_batch_size":
+                cf_batch_size = testvals[1][i]
+            elif testvals[0] == "cf_learning_rate_decay":
+                cf_learning_rate_decay = testvals[1][i]
+            elif testvals[0] == "cf_momentum":
+                cf_momentum = testvals[1][i]
+                cf_optimizer = 2
+            elif testvals[0] == "cf_image_size_min_resize":
+                cf_image_size_min_resize = testvals[1][i]
+            elif testvals[0] == "cf_dropout_rate":
+                cf_dropout_rate = testvals[1][i]
+            elif testvals[0] == "cf_optimizer":
+                cf_optimizer = testvals[1][i]
+            elif testvals[0] == "cf_min_max_scaling":
+                cf_min_max_scaling = testvals[1][i]
+            elif testvals[0] == "cf_standardization":
+                cf_standardization = testvals[1][i]
 
 
-    try:
-        net.train()
-        var = 2
-    except KeyboardInterrupt:
-        log.log("WARNING: User interrupted progess. Saving latest results.")
-
-        finalizeAndSave = input("Do you want to save the latest data? [y/n]")
-        if finalizeAndSave != "n":
-            log.log("Saving latest results.")
-            redo_finalize(True)
-            sys.exit()
+        if len(sys.argv) == 1:
+            # use default file path
+            cfc_datasetpath = cfc_datasetpath_init
         else:
-            log.log("Results deleted.")
+            #use user specified file path
+            cfc_datasetpath = sys.argv[1]
+
+        # load data
+        log.log('Preparing ' + cfc_dataset_name + ' dataset..')
+        if(cf_dataset == 0):
+            calLoader = cl.CaltechLoader(cfc_datasetpath, cfc_cache_dataset_hdd, cf_max_samples, cf_min_max_scaling,
+                                         cf_standardization, cf_head_rel_pos_prev_row, cf_head_rel_pos_prev_col,
+                                         cf_validation_set_size, cf_image_size_min_resize)
 
 
-    # visualization
-    if cf_visualize_results:
-        visualizer = visualizer.Visualizer()
-        visualizer.visualizeTestVideos(net, calLoader)
+        # Creating network
+        net = cnn.ConvolutionalNetwork(calLoader,
+                                       cf_batch_size,
+                                       cf_learning_rate,
+                                       cf_num_iters,
+                                       cf_learning_rate_decay,
+                                       cf_momentum,
+                                       cf_timeout_minutes,
+                                       cf_log_dir,
+                                       cf_dropout_rate,
+                                       cf_optimizer,
+                                       cf_head_rel_pos_prev_row,
+                                       cf_head_rel_pos_prev_col,
+                                       cf_accuracy_weight_direction,
+                                       cf_accuracy_weight_distance,
+                                       cf_learning_rate_min,
+                                       cf_max_batch_size)
 
-    redo_finalize(cf_log_auto_save)
+        # Training
+        log.log('Start Training..')
+        if cf_timeout_minutes  > 0:
+            log.log('.. timeout after {} minutes'.format(cf_timeout_minutes))
+        log.log('.. total number of iterations: {}'.format(cf_num_iters))
+        log.log('.. batch size in each iteration: {}'.format(cf_batch_size))
+        log.log('.. learning rate: {}'.format(cf_learning_rate))
+        log.log('.. learning rate decay: {}'.format(cf_learning_rate_decay))
+        log.log('.. learning rate minimum: {}'.format(cf_learning_rate_min))
 
-    #except Exception as e:  #TODO
-    #    log.log("crash detected. auto repairing.. redo.. " + e.message)
-    #    i -= 1 # on error: redo this iteration
+        # print optimizer
+        optimizer_name = "unknown"
+        if cf_optimizer == 0:
+            optimizer_name= "GradientDescentOptimizer"
+        elif cf_optimizer == 1:
+            optimizer_name = "AdamOptimizer"
+        elif cf_optimizer == 2:
+            optimizer_name = "MomentumOptimizer"
+        log.log('.. optimizer: {}'.format(optimizer_name))
+
+        if cf_optimizer == 2:
+            log.log('.. momentum update: {}'.format(cf_momentum))
+
+
+        try:
+            net.train()
+            var = 2
+        except KeyboardInterrupt:
+            log.log("WARNING: User interrupted progess. Saving latest results.")
+
+            finalizeAndSave = input("Do you want to save the latest data? [y/n]")
+            if finalizeAndSave != "n":
+                log.log("Saving latest results.")
+                redo_finalize(True)
+                sys.exit()
+            else:
+                log.log("Results deleted.")
+
+
+        # visualization
+        if cf_visualize_results:
+            visualizer = visualizer.Visualizer()
+            visualizer.visualizeTestVideos(net, calLoader)
+
+        redo_finalize(cf_log_auto_save)
+
+    except Exception as e:  #TODO
+        log.log("crash detected. auto repairing.. redo.. " + e.message)
+        i -= 1 # on error: redo this iteration
 
     i += 1

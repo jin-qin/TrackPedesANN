@@ -7,7 +7,7 @@ import os
 import cv2 as cv
 import random
 import string
-from py_faster_rcnn.tools.detect_pedestrians import *
+#from py_faster_rcnn.tools.detect_pedestrians import *
 
 class ConvolutionalNetwork:
     def __init__(self, calLoader,
@@ -110,7 +110,7 @@ class ConvolutionalNetwork:
         # allow saving results to file
         summary_writer = tf.train.SummaryWriter(os.path.join(self.log_dir, self.session_name + "-tf-summary"), self.session.graph)
 
-        interrupt_every_x_steps = min(self.iterations / 2.5, 1000, 100) #TODO remove ", 10" on computer with higher performance
+        interrupt_every_x_steps = min(self.iterations / 2.5, 1000, 100)
         interrupt_every_x_steps_late = max(self.iterations / 4, 1)
         for step in range(self.iterations):
 
@@ -129,7 +129,7 @@ class ConvolutionalNetwork:
                                      feed_dict)
 
             # write the summaries and print an overview quite often
-            if True or step % 100 == 0 or (step + 1) == self.iterations: #TODO remove "True or"
+            if True or step % 100 == 0 or (step + 1) == self.iterations:
                 # Print status
                 log.log('Iteration {0}/{1}: loss = {2:.2f}, learning rate = {3:.4f}'.format(step + 1, self.iterations, loss_value, self.session.run(self.learning_rate)))
                 # Update the events file.
@@ -226,7 +226,6 @@ class ConvolutionalNetwork:
                     input_source = self.x_current
 
                 # build actual (part of) convolutional layer
-                # TODO no activation function ?? e.g.: h_conv = tf.nn.relu(h_conv)
                 h_conv = self.conv2d(input_source, W_conv1) + b_conv1
 
             # Layer S1 is a pooling layer with 10 feature maps using max operation
@@ -234,7 +233,6 @@ class ConvolutionalNetwork:
             # feature map of C1. So we can just connect each part of C1 right after
             # creating to the corresponding part of S1
             # => 2x2 pooling (as only 4 values are used)
-            # TODO ensure that those params are equivalent to the given formula in the paper (they should fit)
             with tf.name_scope("S1_part{}".format(i + 1)):
                 S1.append(self.max_pool_2x2(h_conv))
 
@@ -325,7 +323,6 @@ class ConvolutionalNetwork:
                      self.number_of_filters_conv2])
 
                 # build actual (part of) convolutional layer
-                # TODO no activation function ?? e.g.: h_conv = tf.nn.relu(h_conv)
                 h_conv = self.conv2d(c2_input, W_conv2) + b_conv2 #C2
 
                 # Layer S2 is a pooling layer with 33 feature maps using max operation
@@ -333,7 +330,6 @@ class ConvolutionalNetwork:
                 # feature map of C2. So we can just connect each part of C2 right after
                 # creating to the corresponding part of S2
                 # => 2x2 pooling (as only 4 values are used)
-                # TODO ensure that those params are equivalent to the given formula in the paper (they should fit)
                 with tf.name_scope("S2_part{}".format(i + 1)):
                     S2.append(self.max_pool_2x2(h_conv))
 
@@ -373,7 +369,6 @@ class ConvolutionalNetwork:
                  self.number_of_filters_conv3])
 
             # build actual (part of) convolutional layer
-            # TODO no activation function ?? e.g.: h_conv = tf.nn.relu(h_conv)
             C3 = self.conv2d(c3_input, W_conv3) + b_conv3
 
         # (4 times??) upsamling to 24 x 64
@@ -402,16 +397,15 @@ class ConvolutionalNetwork:
                  self.number_of_filters_conv4])
 
             # build actual (part of) convolutional layer
-            # TODO no activation function ?? e.g.: h_conv = tf.nn.relu(h_conv)
             C4 = self.conv2d(c4_input, W_conv4) + b_conv4
 
-        # TODO the paper mentiones a translation transfrom at this point. Check out what this means and if we need
+
         print '4',[self.conv4_filter_width, self.conv4_filter_height, c4number_channels,
                  self.number_of_filters_conv4]
         W_conv4, b_conv4 = self.vars_W_b(
             [self.conv4_filter_width, self.conv4_filter_height, c4number_channels,
              self.number_of_filters_conv4])
-        # to do anything
+
 
         ##### LOCAL BRANCH End ########
 
@@ -517,10 +511,12 @@ class ConvolutionalNetwork:
         ## accuracy End ###
 
 
+    # keep in mind: (not needed for accuracy, but for "real" tracking:)
+    # scale is still 0.5, so we need to multiply by 2
     def get_target_position(self, probs_1d):
 
         # TODO does this give the correct position?
-        # TODO (not needed for accuracy, but for "real" tracking:) scale is still 0.5, so we need to multiply by 2
+
         position_predicted_1D = tf.reshape(tf.argmax(probs_1d, 1),tf.pack([self.batch_size, 1]))
         row = position_predicted_1D / self.output_width  # needs to be floored
         column = position_predicted_1D % self.output_width
@@ -638,8 +634,7 @@ class ConvolutionalNetwork:
         result = tf.square(tensor)
         result = tf.reduce_sum(result, 1, True)
 
-        # TODO we might skip the sqrt, as the "real scale" doesn't matter to us for camparing distance ratios,
-        # but we need to ensure that angle_between_movements is working correctly, too
+
         result = tf.to_float(result) #everything before might have been integer only
         result = tf.sqrt(result)
 
@@ -709,7 +704,6 @@ class ConvolutionalNetwork:
             if frame_index > 0:
 
                 # if rcnn is activated, use it to correct current tracking
-                # TODO make it parallel
                 if update_rcnn_frames > 0 and frame_index % update_rcnn_frames == 1:
                     ped_pos_init[frame_index - 1] = []
                     temp1, boundingBoxes, temp2 = self.rcnn_detect_objects(frame_prev,self.getRcnn())  # Caffe will occupy GPU, then tensorflow cannot use.
@@ -738,8 +732,6 @@ class ConvolutionalNetwork:
                     for ped_pos in ped_pos_predicted:
                         x, y, w, h = [int(v) for v in ped_pos]
                         cv.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 1)
-
-                    # TODO write the current frame rate (of processing) into the video
 
                     wri.write(frame)
 

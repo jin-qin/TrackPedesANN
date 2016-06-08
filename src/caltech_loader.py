@@ -234,7 +234,7 @@ class CaltechLoader:
             log.log("Finished gradient calculations.")
 
             # convert to np
-            x_prev = np.asarray(x_prev, np.float16) #TODO could int work, too? actually int is enough, but during the calcs?
+            x_prev = np.asarray(x_prev, np.float16)
             x_curr = np.asarray(x_curr, np.float16)
             y = np.asarray(y, np.float16)
 
@@ -258,7 +258,7 @@ class CaltechLoader:
             self.preprocessor.preprocessData([x_prev, x_curr])
 
 
-            # TODO whenever calling other instances (like live camera images in an application) they need to be preprocessed, too
+            # (whenever calling other instances (like live camera images in an application) they need to be preprocessed, too)
 
 
             # datasets are ready! rename and save..
@@ -332,7 +332,7 @@ class CaltechLoader:
         # TODO now we are using RGB instead of BGR, that doesn't fit together.. see above
         # TODO in live_tracking_frame() we use another method for the same intention, check which one is better and use only one
         red, green, blue = self.split_into_rgb_channels(img)
-        inputSample = np.array([red, green, blue, sobelx_8u, sobely_8u], dtype=np.float16) #TODO could int work, too? actually int is enough, but during the calcs?
+        inputSample = np.array([red, green, blue, sobelx_8u, sobely_8u], dtype=np.float16)
 
         inputSample = np.swapaxes(inputSample, 0, 2)
         inputSample = np.swapaxes(inputSample, 0, 1)
@@ -381,7 +381,6 @@ class CaltechLoader:
                     if ped_exists_in_prev_frame:
 
                         # pedestrians face is supposed to be at the center of the given rectangle
-                        # TODO or do we need to normalize the images to set the face to a specific position??
                         img_ped = img_curr[y:y + h, x:x + w]
 
 
@@ -392,7 +391,6 @@ class CaltechLoader:
                         if not(w_real < self.image_size_min_resize or h_real < self.image_size_min_resize):
 
                             # resize all images
-                            # TODO check how to resize probably for different-ratio image patches
                             resized_image = cv.resize(img_ped, (self.image_width, self.image_height))
 
                             resized_image_prev = cv.resize(img_ped_prev, (self.image_width, self.image_height))
@@ -408,7 +406,6 @@ class CaltechLoader:
                             # but as we choose the image patch based on the previous and not the current frame,
                             # the relative position is not guaranteed to be in the center. Calculate the relative
                             # position and use it to generate a target probability map.
-                            # TODO check whether there is a better target position given in the caltech metadata
                             absolute_center_x = x + (w * self.head_rel_pos_prev_col)
                             absolute_center_y = y + (h * self.head_rel_pos_prev_row) #not center, but upper quarter
                             relative_center_x = absolute_center_x - x_prev
@@ -475,8 +472,7 @@ class CaltechLoader:
                 scores[y][x] = np.exp(-( np.square(x - center_x) + np.square(y - center_y)) / (2 * sigma_square))
 
         # use softmax to allow probability interpretations
-        # TODO for some reason softmax is not returning reasonable results right now. fix it and turn it on again
-        #(that's why currently tensorflows softmax is applied to Y,too)
+        # Update: we do this in tensorflow
         #probs = self.softmax(scores)
 
         return scores

@@ -28,7 +28,7 @@ Other nodes:
 # general
 cf_max_samples = 0 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
 cf_num_iters = 1000
-cf_batch_size = 128
+cf_batch_size = 50
 cf_validation_set_size = int(round(cf_max_samples * 0.1)) # this absolute number of images will be taken from the training images and used as validation data
 cf_min_max_scaling = True #turn on either this or cf_standardization
 cf_standardization = True #turn on either this or cf_min_max_scaling
@@ -117,10 +117,10 @@ param_test_cf_image_size_min_resize = [
     "cf_image_size_min_resize",  # string name
     [48 * 0.5, 48 * 0.75, 48, 48 * 1.2, 48 * 1.5, 48 * 2]]  # values
 param_test_cf_image_size_min_resize = [
-    "cf_min_max_scaling",  # TODO CLEAN CACHE AFTER EACH ITERATION (of this parameter)!!
+    "cf_min_max_scaling",  # CLEAN CACHE AFTER EACH ITERATION (of this parameter)!!
     [True, False]]  # values
 param_test_cf_standardization = [
-    "cf_standardization",  # TODO CLEAN CACHE AFTER EACH ITERATION (of this parameter)!!
+    "cf_standardization",  # CLEAN CACHE AFTER EACH ITERATION (of this parameter)!!
     [True, False]]  # values
 
 
@@ -168,7 +168,6 @@ eval_i_max = len(testvals[1])
 i=0
 while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside the loop
 
-    #try: #TODO
 
     # Loading data
     log.log('###############################################################')
@@ -280,9 +279,5 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
         visualizer.visualizeTestVideos(net, calLoader)
 
     redo_finalize(cf_log_auto_save)
-
-    #except Exception as e:  #TODO
-    #    log.log("crash detected. auto repairing.. redo.. " + e.message)
-    #    i -= 1 # on error: redo this iteration
 
     i += 1

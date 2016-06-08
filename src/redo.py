@@ -233,7 +233,8 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
                                    cf_accuracy_weight_direction,
                                    cf_accuracy_weight_distance,
                                    cf_learning_rate_min,
-                                   cf_max_batch_size)
+                                   cf_max_batch_size,
+                                   saved_model=None)  # Change None to path to checkpoint
 
     # Training
     log.log('Start Training..')

@@ -25,7 +25,7 @@ class ConvolutionalNetwork:
                  accuracy_weight_direction=0.8,
                  accuracy_weight_distance=0.2,
                  learning_rate_min=0.01,
-                 max_batch_size=None):
+                 max_batch_size=None, saved_model=None):
 
 
         # save given params
@@ -86,7 +86,7 @@ class ConvolutionalNetwork:
             log.log('.. drop out rate: {}'.format(self.dropout_rate))
 
         # begin with actual network creation
-        self.setUpArchitecture()
+        self.setUpArchitecture(saved_model)
 
 
 
@@ -202,7 +202,7 @@ class ConvolutionalNetwork:
         log.log('.. training finished.')
 
 
-    def setUpArchitecture(self):
+    def setUpArchitecture(self, saved_model = None):
 
         # input data: two batches of images. equal indices of the two batches must form valid pairs.
         # e.g. x_previous[i] and x_current[i] a one valid frame pair. Each image has the size = 48 x 128.
@@ -505,6 +505,8 @@ class ConvolutionalNetwork:
         init = tf.initialize_all_variables()
         self.session.run(init)
 
+        if saved_model is not None:
+            self.saver.restore(self.session, saved_model)
 
         ## accuracy Begin ###
 

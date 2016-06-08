@@ -24,6 +24,10 @@ import scipy.io as sio
 import caffe, os, sys, cv2
 import argparse
 from PIL import Image
+from test_camera import *
+import thread
+from multiprocessing.pool import ThreadPool
+import threading
 
 CLASSES = ('__background__',
            'aeroplane', 'bicycle', 'bird', 'boat',
@@ -162,6 +166,38 @@ def detect_objects_from_video(video_path,is_gpu=True):
     video_writer.release()
 
 
+def detect_objects_from_camera():
+    camera=open_camera()
+    net = setup_model()
+    cv2.namedWindow("test", cv2.WND_PROP_FULLSCREEN)
+    cv2.setWindowProperty("test", cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
+    #cv2.startWindowThread()
+    #pool = ThreadPool(processes=1)
+    #async_result = pool.apply_async(thread_show_camera_frames, (camera,))
+    #thread.start_new_thread(thread_show_camera_frames,(camera,))
+    while True:
+        retval, frame = camera.read()
+        if not retval:
+            print "Read failed!"
+            exit(-1)
+        detected_results = detect_objects(frame, net)
+        cv2.imshow('test', detected_results[0])
+        if cv2.waitKey(1) == 27:
+            print "Press ESC to exit"
+            break
+    cv2.destroyAllWindows()
+def thread_show_camera_frames(camera):
+    cv2.namedWindow("test", cv2.WND_PROP_FULLSCREEN)
+    cv2.setWindowProperty("test", cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
+    while True:
+        retval, frame = camera.read()
+        if not retval:
+            print "Read failed!"
+        cv2.imshow('test', frame)
+        if cv2.waitKey(1) == 27:
+            print "Press ESC to exit"
+            break
+    cv2.destroyAllWindows()
 def parse_args():
     """Parse input arguments."""
     parser = argparse.ArgumentParser(description='Faster R-CNN')
@@ -184,4 +220,5 @@ if __name__ == '__main__':
     #print imgs_path
     #all_objects,all_scores=detect_objects(imgs_path)
     #np.save('detected_results',all_objects)
-    detect_objects_from_video('/home/jin/Desktop/TrackingCNN/src/data/caltech/set00/V000.seq')
+    #detect_objects_from_video('/home/jin/Desktop/TrackingCNN/src/data/caltech/set00/V000.seq')
+    detect_objects_from_camera()

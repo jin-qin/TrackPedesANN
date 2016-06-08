@@ -7,7 +7,7 @@ import os
 import cv2 as cv
 import random
 import string
-#from py_faster_rcnn.tools.detect_pedestrians import *
+from py_faster_rcnn.tools.detect_pedestrians import *
 
 class ConvolutionalNetwork:
     def __init__(self, calLoader,
@@ -730,6 +730,7 @@ class ConvolutionalNetwork:
                 cv.cv.CV_FOURCC(*'XVID'), 30, (640, 480))
 
         frame_index = 0
+        net = self.getRcnn()
         for frame in frames:
 
             # if this frame doesn't provide any information yet, we need to add an empty list before extending it
@@ -743,7 +744,7 @@ class ConvolutionalNetwork:
                 # TODO make it parallel
                 if update_rcnn_frames > 0 and frame_index % update_rcnn_frames == 1:
                     ped_pos_init[frame_index - 1] = []
-                    temp1, boundingBoxes, temp2 = self.rcnn_detect_objects(frame_prev,self.getRcnn())  # Caffe will occupy GPU, then tensorflow cannot use.
+                    temp1, boundingBoxes, temp2 = self.rcnn_detect_objects(frame_prev,net)
                     for box in boundingBoxes:
                         width = box[2] - box[0]
                         height = box[2] - box[0]
@@ -904,14 +905,11 @@ class ConvolutionalNetwork:
 
         return self.rcnn
 
-
-
-    def rcnn_detect_objects(self, imgs_path):
+    def rcnn_detect_objects(self, img,net):
         """
         This function can only be used before start tensorflow!!!
         :param imgs_path: The path of image
         :return: detected results
         """
-        os.system("python py_faster_rcnn/tools/detect_pedestrians.py -path " + imgs_path)
-        detected_results = np.load('detected_results.npy')
+        detected_results=detect_objects(img,net)
         return detected_results

@@ -26,8 +26,8 @@ Other nodes:
 ###############################################################
 
 # general
-cf_max_samples = 20000 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
-cf_num_iters = 10000
+cf_max_samples = 100 # maximum number of loaded ([training + validation] or test) samples. 0=unlimited
+cf_num_iters = 1000
 cf_batch_size = 128
 cf_validation_set_size = int(round(cf_max_samples * 0.1)) # this absolute number of images will be taken from the training images and used as validation data
 cf_min_max_scaling = True #turn on either this or cf_standardization
@@ -46,7 +46,7 @@ cfc_cache_dataset_hdd = True # reminder: if this is turned on, and you want to c
 cf_timeout_minutes = 0 # maximum number of minutes used for training. 0=unlimited
 cf_log_auto_save = True #if True, the log file will be saved automatically as soon as all calculations have been finished correctly
 cf_log_dir = cf_log_dir_init = "logs"
-cfc_datasetpath_init = "/home/samuel/Databases" # path to the (Caltech) dataset. Can be overriden by commandline parameter.
+cfc_datasetpath_init = "./data" # path to the (Caltech) dataset. Can be overriden by commandline parameter.
 cf_max_batch_size = 250 # maximum number of samples that will be processed at once. Set to None for now limit on high-end computers. otherwise decrease for less memory requirements
 
 # relative horizontale position assumed for the pedestrians head in the previous frame.
@@ -234,7 +234,7 @@ while i < eval_i_max: # don't use a for-loop, as we want to manipulate i inside 
                                    cf_accuracy_weight_distance,
                                    cf_learning_rate_min,
                                    cf_max_batch_size,
-                                   saved_model='super.awesome')  # Change None to path to checkpoint
+                                   saved_model=None)  # Change None to path to checkpoint
 
     # Training
     log.log('Start Training..')
